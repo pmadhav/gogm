@@ -238,8 +238,10 @@ func (s *SessionV2Impl) LoadDepthFilterPagination(ctx context.Context, respObj, 
 	var err error
 
 	paramName := "idprm"
-	isGraphId := s.gogm.pkStrategy.StrategyName == DefaultPrimaryKeyStrategy.StrategyName
-	field := s.gogm.pkStrategy.DBName
+	// Get the PKS
+	pks := s.gogm.getPrimaryKeyStrategy(respType.Name())
+	isGraphId := pks.StrategyName == DefaultPrimaryKeyStrategy.StrategyName
+	field := pks.DBName
 	//make the query based off of the load strategy
 	switch s.gogm.config.LoadStrategy {
 	case PATH_LOAD_STRATEGY:

@@ -668,8 +668,10 @@ func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart 
 		return errors.New("unable to cast into struct decorator config")
 	}
 
+	// Get the PKS given the nodeType
+	pks := gogm.getPrimaryKeyStrategy(nodeType)
 	// grab info and set ids of current node
-	isNew, graphID, relConf, err := handleNodeState(gogm.pkStrategy, current)
+	isNew, graphID, relConf, err := handleNodeState(pks, current)
 	if err != nil {
 		return fmt.Errorf("failed to handle node, %w", err)
 	}

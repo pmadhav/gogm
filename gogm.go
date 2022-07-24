@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/cornelk/hashmap"
@@ -48,36 +49,60 @@ func G() *Gogm {
 // Gogm defines an instance of the GoGM OGM with a configuration and mapped types
 type Gogm struct {
 	config           *Config
-	pkStrategy       *PrimaryKeyStrategy
+	pkStrategies     map[string]*PrimaryKeyStrategy // a map of name of PKS to PKS structures
+	pkStrategyTypes  map[string][]interface{}       // a map of name of PKS to types that use that PKS
+	typeStrategies   map[string]string              // a map of types of name to the name of the PKS they use
 	logger           Logger
 	boltMajorVersion int
 	mappedTypes      *hashmap.HashMap
 	driver           neo4j.Driver
 	mappedRelations  *relationConfigs
-	ogmTypes         []interface{}
 	// isNoOp specifies whether this instance of gogm can do anything
 	// is only used for the default global gogm
 	isNoOp bool
 }
 
 // New returns an instance of gogm
-// mapTypes requires pointers of the types to map and will error out if pointers are not provided
-func New(config *Config, pkStrategy *PrimaryKeyStrategy, mapTypes ...interface{}) (*Gogm, error) {
-	return NewContext(context.Background(), config, pkStrategy, mapTypes...)
+// pkStrategies takes a map of strategies that are supported
+// pkStrategyTypes takes a map of Types. The Types need to be pointers of the types
+// that should be mapped to each particular primary key strategy and will error out
+// if pointers are not provided
+func New(config *Config, pkStrategies map[string]*PrimaryKeyStrategy, pkStrategyTypes map[string][]interface{}) (*Gogm, error) {
+	return NewContext(context.Background(), config, pkStrategies, pkStrategyTypes)
 }
 
 // NewContext returns an instance of gogm but also takes in a context since NewContext creates a driver instance and reaches out to the database
-func NewContext(ctx context.Context, config *Config, pkStrategy *PrimaryKeyStrategy, mapTypes ...interface{}) (*Gogm, error) {
+func NewContext(ctx context.Context, config *Config, pkStrategies map[string]*PrimaryKeyStrategy, pkStrategyTypes map[string][]interface{}) (*Gogm, error) {
 	if config == nil {
 		return nil, errors.New("config can not be nil")
 	}
 
-	if pkStrategy == nil {
-		return nil, errors.New("pk strategy can not be nil")
+	if pkStrategies == nil {
+		return nil, errors.New("please provide a map of primary key strategies to be used")
 	}
 
-	if len(mapTypes) == 0 {
-		return nil, errors.New("no types to map")
+	if pkStrategyTypes == nil {
+		return nil, errors.New("please provide a map of primary key strategies to the types that use it")
+	}
+
+	if len(pkStrategies) != len(pkStrategyTypes) {
+		return nil, errors.New("number of strategies for which types was provided for does not match the number of provided strategies")
+	}
+
+	var k1, k2 []string
+	getKeys(pkStrategies, &k1)
+	getKeys(pkStrategyTypes, &k2)
+	sort.Strings(k1)
+	sort.Strings(k2)
+
+	if !Equal(k1, k2) {
+		return nil, errors.New("keys of the 2 maps for strategies and strategy types do not match")
+	}
+
+	for k, v := range pkStrategyTypes {
+		if len(v) == 0 {
+			return nil, fmt.Errorf("no types to map for strategy: %s", k)
+		}
 	}
 
 	g := &Gogm{
@@ -87,8 +112,8 @@ func NewContext(ctx context.Context, config *Config, pkStrategy *PrimaryKeyStrat
 		mappedTypes:      &hashmap.HashMap{},
 		driver:           nil,
 		mappedRelations:  &relationConfigs{},
-		ogmTypes:         mapTypes,
-		pkStrategy:       pkStrategy,
+		pkStrategies:     pkStrategies,
+		pkStrategyTypes:  pkStrategyTypes,
 	}
 
 	err := g.init(ctx)
@@ -140,31 +165,38 @@ func (g *Gogm) validate() error {
 		g.config.TargetDbs = []string{"neo4j"}
 	}
 
-	if g.pkStrategy == nil {
-		// setting to the default pk strategy
-		g.pkStrategy = DefaultPrimaryKeyStrategy
-	}
-
-	err = g.pkStrategy.validate()
-	if err != nil {
-		return fmt.Errorf("pk strategy failed validation, %w", err)
+	for k, v := range g.pkStrategies {
+		err = v.validate()
+		if err != nil {
+			return fmt.Errorf("pk strategy %s failed validation, %w", k, err)
+		}
 	}
 
 	return nil
 }
 
+// Return the PKS given the name of a struct
+func (g *Gogm) getPrimaryKeyStrategy(structName string) *PrimaryKeyStrategy {
+	k := g.typeStrategies[structName]
+	return g.pkStrategies[k]
+}
+
 // parseOgmTypes parses the provided ogm types and decodes/maps them
 func (g *Gogm) parseOgmTypes() error {
 	g.logger.Debug("mapping types")
-	for _, t := range g.ogmTypes {
-		name := reflect.TypeOf(t).Elem().Name()
-		dc, err := getStructDecoratorConfig(g, t, g.mappedRelations)
-		if err != nil {
-			return fmt.Errorf("failed to get structDecoratorConfig for %s, %w", name, err)
-		}
+	for k, v := range g.pkStrategyTypes {
+		for _, t := range v {
+			name := reflect.TypeOf(t).Elem().Name()
+			dc, err := getStructDecoratorConfig(g, t, g.mappedRelations)
+			if err != nil {
+				return fmt.Errorf("failed to get structDecoratorConfig for pk: %s type: %s, %w", k, name, err)
+			}
 
-		g.logger.Debugf("mapped type %s", name)
-		g.mappedTypes.Set(name, *dc)
+			g.logger.Debugf("mapped type %s", name)
+			g.mappedTypes.Set(name, *dc)
+			// Set the strategy to be used for a type
+			g.typeStrategies[name] = k
+		}
 	}
 
 	// validate relationships
@@ -352,7 +384,10 @@ func (g *Gogm) Copy() *Gogm {
 		mappedTypes:      g.mappedTypes,
 		driver:           g.driver,
 		mappedRelations:  g.mappedRelations,
-		ogmTypes:         g.ogmTypes,
+		pkStrategies:     g.pkStrategies,
+		pkStrategyTypes:  g.pkStrategyTypes,
+		typeStrategies:   g.typeStrategies,
+		// ogmTypes:         g.ogmTypes,
 	}
 }
 

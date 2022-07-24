@@ -235,14 +235,15 @@ func (d *decoratorConfig) validate(gogm *Gogm) error {
 	//validate pk
 	// ignore default since everything should have that
 	if d.PrimaryKey != "" && d.PrimaryKey != DefaultPrimaryKeyStrategy.StrategyName {
+		s := gogm.getPrimaryKeyStrategy(d.ParentType.Name())
 		// validate strategy matches
-		if d.PrimaryKey != gogm.pkStrategy.StrategyName {
-			return fmt.Errorf("trying to use strategy '%s' when '%s' is registered", d.PrimaryKey, gogm.pkStrategy.StrategyName)
+		if d.PrimaryKey != s.StrategyName {
+			return fmt.Errorf("trying to use strategy '%s' when '%s' is registered", d.PrimaryKey, s.StrategyName)
 		}
 
 		// validate type is correct
-		if d.Type != gogm.pkStrategy.Type {
-			return fmt.Errorf("struct defined type (%s) different than register pk type (%s)", d.Type.Name(), gogm.pkStrategy.Type.Name())
+		if d.Type != s.Type {
+			return fmt.Errorf("struct defined type (%s) different than register pk type (%s)", d.Type.Name(), s.Type.Name())
 		}
 	}
 
@@ -289,10 +290,12 @@ func newDecoratorConfig(gogm *Gogm, decorator, name string, varType reflect.Type
 				continue
 			case primaryKeyField:
 				toReturn.PrimaryKey = val
+				// Get the primary key strategy for the parent struct type
+				pk := gogm.getPrimaryKeyStrategy(parentType.Name())
 				// set other stuff related to the pk strategy
-				if gogm.pkStrategy.StrategyName == val {
-					toReturn.Name = gogm.pkStrategy.DBName
-					toReturn.FieldName = gogm.pkStrategy.FieldName
+				if pk.StrategyName == val {
+					toReturn.Name = pk.DBName
+					toReturn.FieldName = pk.FieldName
 				}
 				continue
 			case relationshipNameField:

@@ -29,6 +29,34 @@ import (
 	dsl "github.com/mindstand/go-cypherdsl"
 )
 
+func getTypesSlice(types ...interface{}) []interface{} {
+	return types
+}
+
+// Keys returns the keys of the map m.
+// The keys will be an indeterminate order.
+// Keys stores the keys from m to the slice pointed to by pkeys.
+// The slice element type must be the same as the map key type.
+func getKeys(m interface{}, pkeys interface{}) {
+	result := reflect.ValueOf(pkeys).Elem()
+	result.SetLen(0)
+	result.Set(reflect.Append(result, reflect.ValueOf(m).MapKeys()...))
+}
+
+// Equal tells whether a and b contain the same elements.
+// A nil argument is equivalent to an empty slice.
+func Equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // checks if integer is in slice
 func int64SliceContains(s []int64, e int64) bool {
 	for _, a := range s {
@@ -172,7 +200,9 @@ func toCypherParamsMap(gogm *Gogm, val reflect.Value, config structDecoratorConf
 					// we dont want to write the id to the params map
 					continue
 				}
-				ret[gogm.pkStrategy.DBName] = val
+				// Get the PKS for the given struct
+				pks := gogm.getPrimaryKeyStrategy(config.Type.Name())
+				ret[pks.DBName] = val
 			} else {
 				ret[conf.Name] = val
 			}
