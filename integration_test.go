@@ -73,7 +73,7 @@ func (integrationTest *IntegrationTestSuite) SetupSuite() {
 	// this is ignore because index management is part of the test
 	integrationTest.config.IndexStrategy = IGNORE_INDEX
 	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": getTypesSlice(&a{}, &b{}, &c{}, &propTest{}, &narcissisticTestNode{}, &Sides{}, &Middle{}, &Bottom{})}
+	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&a{}, &b{}, &c{}, &propTest{}, &narcissisticTestNode{}, &Sides{}, &Middle{}, &Bottom{})}
 
 	integrationTest.gogm, err = New(integrationTest.config, pkStrategies, pkStrategyTypes)
 	integrationTest.Require().Nil(err)
@@ -128,7 +128,7 @@ func (integrationTest *IntegrationTestSuite) TestV4Index() {
 	assertCopy := *integrationTest.config
 	assertCopy.IndexStrategy = ASSERT_INDEX
 	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": getTypesSlice(&indexTestStruct{})}
+	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&indexTestStruct{})}
 	_, err := New(&assertCopy, pkStrategies, pkStrategyTypes)
 	integrationTest.Assert().Nil(err)
 
@@ -152,7 +152,7 @@ func (integrationTest *IntegrationTestSuite) TestSecureConnection() {
 
 	integrationTest.config = conf
 	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": getTypesSlice(&a{}, &b{}, &c{}, &propTest{})}
+	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&a{}, &b{}, &c{}, &propTest{})}
 	gogm, err := New(conf, pkStrategies, pkStrategyTypes)
 	integrationTest.Require().Nil(err)
 	integrationTest.Require().NotNil(gogm)

@@ -26,7 +26,7 @@ func TestSessionV2Impl_LoadAll(t *testing.T) {
 	config.IndexStrategy = IGNORE_INDEX
 	config.CAFileLocation = filepath.Join(container.CertDir, "ca-public.crt")
 	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": getTypesSlice(&a{}, &b{}, &c{}, &propTest{})}
+	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&a{}, &b{}, &c{}, &propTest{})}
 
 	gogm, err := New(config, pkStrategies, pkStrategyTypes)
 	req.Nil(err)

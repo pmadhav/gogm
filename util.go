@@ -29,7 +29,7 @@ import (
 	dsl "github.com/mindstand/go-cypherdsl"
 )
 
-func getTypesSlice(types ...interface{}) []interface{} {
+func GetTypesSlice(types ...interface{}) []interface{} {
 	return types
 }
 
