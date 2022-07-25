@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/mindstand/gogm/v2"
 	"reflect"
 	"time"
+
+	"github.com/pmadhav/gogm/v2"
 )
 
 type tdString string
@@ -101,7 +102,9 @@ func main() {
 	// register all vertices and edges
 	// this is so that GoGM doesn't have to do reflect processing of each edge in real time
 	// use nil or gogm.DefaultPrimaryKeyStrategy if you only want graph ids
-	_gogm, err := gogm.New(&config, gogm.UUIDPrimaryKeyStrategy, &VertexA{}, &VertexB{}, &EdgeC{})
+	pks := map[string]*gogm.PrimaryKeyStrategy{"UUID": gogm.UUIDPrimaryKeyStrategy}
+	pkm := map[string][]interface{}{"UUID": gogm.GetTypesSlice(&VertexA{}, &VertexB{}, &EdgeC{})}
+	_gogm, err := gogm.New(&config, pks, pkm)
 	if err != nil {
 		panic(err)
 	}
