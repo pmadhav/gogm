@@ -114,6 +114,7 @@ func NewContext(ctx context.Context, config *Config, pkStrategies map[string]*Pr
 		mappedRelations:  &relationConfigs{},
 		pkStrategies:     pkStrategies,
 		pkStrategyTypes:  pkStrategyTypes,
+		typeStrategies:   make(map[string]string),
 	}
 
 	err := g.init(ctx)
@@ -187,6 +188,8 @@ func (g *Gogm) parseOgmTypes() error {
 	for k, v := range g.pkStrategyTypes {
 		for _, t := range v {
 			name := reflect.TypeOf(t).Elem().Name()
+			// Set the strategy to be used for a type
+			g.typeStrategies[name] = k
 			dc, err := getStructDecoratorConfig(g, t, g.mappedRelations)
 			if err != nil {
 				return fmt.Errorf("failed to get structDecoratorConfig for pk: %s type: %s, %w", k, name, err)
@@ -194,8 +197,6 @@ func (g *Gogm) parseOgmTypes() error {
 
 			g.logger.Debugf("mapped type %s", name)
 			g.mappedTypes.Set(name, *dc)
-			// Set the strategy to be used for a type
-			g.typeStrategies[name] = k
 		}
 	}
 
