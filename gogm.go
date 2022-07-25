@@ -63,11 +63,26 @@ type Gogm struct {
 }
 
 // New returns an instance of gogm
+// mapTypes requires pointers of the types to map and will error out if pointers are not provided
+func New(config *Config, pkStrategy *PrimaryKeyStrategy, mapTypes ...interface{}) (*Gogm, error) {
+	if pkStrategy == nil {
+		pkStrategy = DefaultPrimaryKeyStrategy
+	}
+	pks := map[string]*PrimaryKeyStrategy{
+		pkStrategy.StrategyName: pkStrategy,
+	}
+	pkt := map[string][]interface{}{
+		pkStrategy.StrategyName: mapTypes,
+	}
+	return NewMulti(config, pks, pkt)
+}
+
+// New returns an instance of gogm
 // pkStrategies takes a map of strategies that are supported
-// pkStrategyTypes takes a map of Types. The Types need to be pointers of the types
+// pkStrategyTypes takes a map of Types Slice. The Types in the slice need to be pointers of the types
 // that should be mapped to each particular primary key strategy and will error out
 // if pointers are not provided
-func New(config *Config, pkStrategies map[string]*PrimaryKeyStrategy, pkStrategyTypes map[string][]interface{}) (*Gogm, error) {
+func NewMulti(config *Config, pkStrategies map[string]*PrimaryKeyStrategy, pkStrategyTypes map[string][]interface{}) (*Gogm, error) {
 	return NewContext(context.Background(), config, pkStrategies, pkStrategyTypes)
 }
 

@@ -25,10 +25,8 @@ func TestSessionV2Impl_LoadAll(t *testing.T) {
 	// this is ignore because index management is part of the test
 	config.IndexStrategy = IGNORE_INDEX
 	config.CAFileLocation = filepath.Join(container.CertDir, "ca-public.crt")
-	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&a{}, &b{}, &c{}, &propTest{})}
 
-	gogm, err := New(config, pkStrategies, pkStrategyTypes)
+	gogm, err := New(config, UUIDPrimaryKeyStrategy, &a{}, &b{}, &c{}, &propTest{})
 	req.Nil(err)
 	req.NotNil(gogm)
 

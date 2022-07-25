@@ -271,6 +271,21 @@ config := gogm.Config{
 
 	// register all vertices and edges
 	// this is so that GoGM doesn't have to do reflect processing of each edge in real time
+	/*
+		// In case you want to use different primary key strategies for different structs,
+		// you can use `NewMulti` to create such a Gogm instance.
+		// For example, let's look at the case where the VertexA & VertexB use the
+		// UUIDPrimaryKeyStrategy whereas EdgeC uses the DefaultPrimaryKeyStrategy
+		pks := map[string]*PrimaryKeyStrategy{
+			"default": gogm.DefaultPrimaryKeyStrategy,
+			"UUID": gogm.UUIDPrimaryKeyStrategy
+		}
+		pkt := map[string][]interface{}{
+			"default": gogm.GetTypesSlice(&EdgeC{}),
+			"UUID": gogm.GetTypesSlice(&VertexA{}, &VertexB{})
+		}
+		_gogm, err := gogm.NewMulti(&config, pks, pkt)
+	*/
 	// use nil or gogm.DefaultPrimaryKeyStrategy if you only want graph ids
 	_gogm, err := gogm.New(&config, gogm.UUIDPrimaryKeyStrategy, &VertexA{}, &VertexB{}, &EdgeC{})
 	if err != nil {

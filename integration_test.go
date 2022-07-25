@@ -72,10 +72,7 @@ func (integrationTest *IntegrationTestSuite) SetupSuite() {
 
 	// this is ignore because index management is part of the test
 	integrationTest.config.IndexStrategy = IGNORE_INDEX
-	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&a{}, &b{}, &c{}, &propTest{}, &narcissisticTestNode{}, &Sides{}, &Middle{}, &Bottom{})}
-
-	integrationTest.gogm, err = New(integrationTest.config, pkStrategies, pkStrategyTypes)
+	integrationTest.gogm, err = New(integrationTest.config, UUIDPrimaryKeyStrategy, &a{}, &b{}, &c{}, &propTest{}, &narcissisticTestNode{}, &Sides{}, &Middle{}, &Bottom{})
 	integrationTest.Require().Nil(err)
 	integrationTest.Require().NotNil(integrationTest.gogm)
 }
@@ -127,14 +124,12 @@ func (integrationTest *IntegrationTestSuite) TestV4Index() {
 
 	assertCopy := *integrationTest.config
 	assertCopy.IndexStrategy = ASSERT_INDEX
-	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&indexTestStruct{})}
-	_, err := New(&assertCopy, pkStrategies, pkStrategyTypes)
+	_, err := New(&assertCopy, UUIDPrimaryKeyStrategy, &indexTestStruct{})
 	integrationTest.Assert().Nil(err)
 
 	validateCopy := *integrationTest.config
 	validateCopy.IndexStrategy = VALIDATE_INDEX
-	_, err = New(&validateCopy, pkStrategies, pkStrategyTypes)
+	_, err = New(&validateCopy, UUIDPrimaryKeyStrategy, &indexTestStruct{})
 	integrationTest.Assert().Nil(err)
 }
 
@@ -151,9 +146,7 @@ func (integrationTest *IntegrationTestSuite) TestSecureConnection() {
 	conf.IndexStrategy = IGNORE_INDEX
 
 	integrationTest.config = conf
-	pkStrategies := map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy}
-	pkStrategyTypes := map[string][]interface{}{"UUID": GetTypesSlice(&a{}, &b{}, &c{}, &propTest{})}
-	gogm, err := New(conf, pkStrategies, pkStrategyTypes)
+	gogm, err := New(conf, UUIDPrimaryKeyStrategy, &a{}, &b{}, &c{}, &propTest{})
 	integrationTest.Require().Nil(err)
 	integrationTest.Require().NotNil(gogm)
 	defer gogm.Close()
