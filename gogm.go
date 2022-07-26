@@ -349,6 +349,45 @@ func (g *Gogm) initDriverRoutine(neoConfig func(neoConf *neo4j.Config), doneChan
 	doneChan <- nil
 }
 
+// Added support to delete all indices and constraints for a single db. This
+// is to handle the case when all known DB's that will be used in the lifetime
+// of an application are not known at the beginning
+func (g *Gogm) DropAllIndexesAndConstraintsForDb(ctx context.Context, dbName string) error {
+	g.logger.Debug(fmt.Sprintf("dropping all known indexes for db: %s", dbName))
+	err := dropAllIndexesAndConstraintsV4(ctx, g, dbName)
+	if err != nil {
+		return fmt.Errorf("failed to drop all known indexes for db: %s, %w", dbName, err)
+	}
+
+	return nil
+}
+
+// Added support to create all indices and constraints for a single db. This
+// is to handle the case when all known DB's that will be used in the lifetime
+// of an application are not known at the beginning
+func (g *Gogm) CreateAllIndexesAndConstraintsForDb(ctx context.Context, dbName string) error {
+	g.logger.Debug(fmt.Sprintf("creating all mapped indexes for db: %s", dbName))
+	err := createAllIndexesAndConstraintsV4(ctx, g, g.mappedTypes, dbName)
+	if err != nil {
+		return fmt.Errorf("failed to create all indexes and constraints for db: %s, %w", dbName, err)
+	}
+
+	return nil
+}
+
+// Added support to verify all indices and constraints for a single db. This
+// is to handle the case when all known DB's that will be used in the lifetime
+// of an application are not known at the beginning
+func (g *Gogm) VerifyAllIndexesAndConstraintsForDb(ctx context.Context, dbName string) error {
+	g.logger.Debug(fmt.Sprintf("verifying all indexes for db: %s", dbName))
+	err := verifyAllIndexesAndConstraintsV4(ctx, g, g.mappedTypes, dbName)
+	if err != nil {
+		return fmt.Errorf("failed to verify all indexes and contraints fo db: %s, %w", dbName, err)
+	}
+
+	return nil
+}
+
 // initIndex initializes indexes based on the provided index strategy
 func (g *Gogm) initIndex(ctx context.Context) error {
 	switch g.config.IndexStrategy {
