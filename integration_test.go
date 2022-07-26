@@ -122,9 +122,14 @@ func (integrationTest *IntegrationTestSuite) TestV4Index() {
 		return
 	}
 
+	createCopy := *integrationTest.config
+	createCopy.IndexStrategy = CREATE_INDEX
+	_, err := New(&createCopy, UUIDPrimaryKeyStrategy, &indexTestStruct{})
+	integrationTest.Assert().Nil(err)
+
 	assertCopy := *integrationTest.config
 	assertCopy.IndexStrategy = ASSERT_INDEX
-	_, err := New(&assertCopy, UUIDPrimaryKeyStrategy, &indexTestStruct{})
+	_, err = New(&assertCopy, UUIDPrimaryKeyStrategy, &indexTestStruct{})
 	integrationTest.Assert().Nil(err)
 
 	validateCopy := *integrationTest.config

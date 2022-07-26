@@ -372,6 +372,21 @@ func (g *Gogm) initIndex(ctx context.Context) error {
 			return fmt.Errorf("failed to verify all indexes and contraints, %w", err)
 		}
 		return nil
+	case CREATE_INDEX:
+		g.logger.Debug("chose CREATE_INDEX strategy")
+
+		g.logger.Debug("creating all mapped indexes")
+		err := createAllIndexesAndConstraints(ctx, g, g.mappedTypes)
+		if err != nil {
+			return fmt.Errorf("failed t create all indexes and constraints, %w", err)
+		}
+
+		g.logger.Debug("verifying all indexes")
+		err = verifyAllIndexesAndConstraints(ctx, g, g.mappedTypes)
+		if err != nil {
+			return fmt.Errorf("failed to verify all indexes and contraints, %w", err)
+		}
+		return nil
 	case VALIDATE_INDEX:
 		g.logger.Debug("chose VALIDATE_INDEX strategy")
 		g.logger.Debug("verifying all indexes")

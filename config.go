@@ -168,11 +168,14 @@ const (
 	VALIDATE_INDEX IndexStrategy = 1
 	// IGNORE_INDEX skips the index step of setup
 	IGNORE_INDEX IndexStrategy = 2
+	// CREATE_INDEX ensures that all indices are set and sets them if they are not there
+	// without first deleting them as in the case of ASSERT_INDEX
+	CREATE_INDEX IndexStrategy = 3
 )
 
 func (is IndexStrategy) validate() error {
 	switch is {
-	case ASSERT_INDEX, VALIDATE_INDEX, IGNORE_INDEX:
+	case ASSERT_INDEX, VALIDATE_INDEX, IGNORE_INDEX, CREATE_INDEX:
 		return nil
 	default:
 		return fmt.Errorf("invalid index strategy %d", is)
