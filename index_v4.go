@@ -24,10 +24,11 @@ import (
 	"errors"
 	"fmt"
 
+	"strings"
+
 	"github.com/adam-hanna/arrayOperations"
 	"github.com/cornelk/hashmap"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"strings"
 )
 
 const (
@@ -61,11 +62,11 @@ func buildIndexQuery(indexType string, fields ...string) string {
 }
 
 func resultToStringArrV4(isConstraint bool, result [][]interface{}) ([]string, error) {
-	if result == nil {
-		return nil, errors.New("result is nil")
-	}
-
 	var _result []string
+
+	if result == nil {
+		return _result, nil
+	}
 
 	var i int
 	if isConstraint {
