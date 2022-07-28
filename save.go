@@ -669,7 +669,7 @@ func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart 
 	}
 
 	// Get the PKS given the nodeType
-	pks := gogm.getPrimaryKeyStrategy(nodeType)
+	pks := gogm.GetPrimaryKeyStrategy(nodeType)
 	// grab info and set ids of current node
 	isNew, graphID, relConf, err := handleNodeState(pks, current)
 	if err != nil {

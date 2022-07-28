@@ -239,7 +239,7 @@ func (s *SessionV2Impl) LoadDepthFilterPagination(ctx context.Context, respObj, 
 
 	paramName := "idprm"
 	// Get the PKS
-	pks := s.gogm.getPrimaryKeyStrategy(respType.Name())
+	pks := s.gogm.GetPrimaryKeyStrategy(respType.Name())
 	isGraphId := pks.StrategyName == DefaultPrimaryKeyStrategy.StrategyName
 	field := pks.DBName
 	//make the query based off of the load strategy

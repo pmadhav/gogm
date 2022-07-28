@@ -201,7 +201,7 @@ func toCypherParamsMap(gogm *Gogm, val reflect.Value, config structDecoratorConf
 					continue
 				}
 				// Get the PKS for the given struct
-				pks := gogm.getPrimaryKeyStrategy(config.Type.Name())
+				pks := gogm.GetPrimaryKeyStrategy(config.Type.Name())
 				ret[pks.DBName] = val
 			} else {
 				ret[conf.Name] = val

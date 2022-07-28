@@ -192,7 +192,7 @@ func (g *Gogm) validate() error {
 }
 
 // Return the PKS given the name of a struct
-func (g *Gogm) getPrimaryKeyStrategy(structName string) *PrimaryKeyStrategy {
+func (g *Gogm) GetPrimaryKeyStrategy(structName string) *PrimaryKeyStrategy {
 	k := g.typeStrategies[structName]
 	return g.pkStrategies[k]
 }
