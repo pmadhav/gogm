@@ -277,7 +277,7 @@ func listComprehension(gogm *Gogm, fromNodeVar, label string, rel decoratorConfi
 	clause := fmt.Sprintf("[(%s)%s(%s:%s) | [%s, %s", fromNodeVar, relString(relVar, rel), toNodeVar, toNodeLabel, relVar, toNodeVar)
 
 	if depth > 0 {
-		toNodeRels, err := getRelationshipsForLabel(gogm, label)
+		toNodeRels, err := getRelationshipsForLabel(gogm, toNodeLabel)
 		if err != nil {
 			return "", err
 		}
