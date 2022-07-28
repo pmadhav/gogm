@@ -34,7 +34,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
-var globalGogm = &Gogm{isNoOp: true, logger: GetDefaultLogger()}
+var globalGogm = &Gogm{isNoOp: true, typeStrategies: make(map[string]string), logger: GetDefaultLogger()}
 
 // SetGlobalGogm sets the global instance of gogm
 func SetGlobalGogm(gogm *Gogm) {

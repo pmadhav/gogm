@@ -297,6 +297,7 @@ func getTestGogm(types ...interface{}) (*Gogm, error) {
 		driver:           nil,
 		mappedRelations:  &relationConfigs{},
 		isNoOp:           false,
+		typeStrategies:   make(map[string]string),
 		pkStrategies:     map[string]*PrimaryKeyStrategy{"UUID": UUIDPrimaryKeyStrategy},
 		pkStrategyTypes:  map[string][]interface{}{"UUID": types},
 	}
