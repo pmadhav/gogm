@@ -21,9 +21,10 @@ package gogm
 
 import (
 	"errors"
+	"reflect"
+
 	dsl "github.com/mindstand/go-cypherdsl"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"reflect"
 )
 
 // deleteNode is used to remove nodes from the database
@@ -106,13 +107,18 @@ func deleteByIds(ids ...int64) neo4j.TransactionWork {
 
 // deleteByUuids deletes nodes by uuids
 func deleteByUuids(ids ...string) neo4j.TransactionWork {
+	return deleteByStrings("uuid", ids...)
+}
+
+// deleteByUuids deletes nodes by uuids
+func deleteByStrings(field string, ids ...string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		cyp, err := dsl.QB().
 			Cypher("UNWIND {rows} as row").
 			Match(dsl.Path().V(dsl.V{Name: "n"}).Build()).
 			Where(dsl.C(&dsl.ConditionConfig{
 				Name:              "n",
-				Field:             "uuid",
+				Field:             field,
 				ConditionOperator: dsl.EqualToOperator,
 				Check:             dsl.ParamString("row"),
 			})).

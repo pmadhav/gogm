@@ -498,7 +498,24 @@ func (s *SessionV2Impl) DeleteUUID(ctx context.Context, uuid string) error {
 	}
 
 	// handle if in transaction
-	return s.runWrite(ctx, deleteByUuids(uuid))
+	return s.DeleteStringKey(ctx, "uuid", uuid)
+}
+
+func (s *SessionV2Impl) DeleteStringKey(ctx context.Context, field string, key string) error {
+	var span opentracing.Span
+	if ctx != nil && s.gogm.config.OpentracingEnabled {
+		span, ctx = opentracing.StartSpanFromContext(ctx, "gogm.SessionV2Impl.DeleteStringKey")
+		defer span.Finish()
+	} else {
+		span = nil
+	}
+
+	if s.neoSess == nil {
+		return errors.New("neo4j connection not initialized")
+	}
+
+	// handle if in transaction
+	return s.runWrite(ctx, deleteByStrings(field, key))
 }
 
 func (s *SessionV2Impl) runWrite(ctx context.Context, work neo4j.TransactionWork) error {

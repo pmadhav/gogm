@@ -91,6 +91,9 @@ type ogmFunctions interface {
 	//delete uuid
 	DeleteUUID(ctx context.Context, uuid string) error
 
+	//delete string key
+	DeleteStringKey(ctx context.Context, field string, key string) error
+
 	//specific query, responds to slice and single objects
 	Query(ctx context.Context, query string, properties map[string]interface{}, respObj interface{}) error
 
