@@ -110,14 +110,14 @@ In case of updates to an object, if the original
 struct is passed, then all the fields of the
 of the struct get updated. If we do not have the
 original object with the original values, then the existing
-values get overwritten by 'nil' values for the field type. To avoid this,
-we can use a struct type `<ORIGINAL_STRUCT><UPDATE_STRUCT_NAME_SUFFIX>`,
-for e.g., 'VertexAPatch' where 'VertexA' is theoriginal
-struct and 'Patch' is the `UPDATE_STRUCT_NAME_SUFFIX` as defined
-in this module. 'VertexA' and 'VertexAPatch' have the exact same fields
+values get overwritten by `nil` values for the field type. To avoid this,
+we use a struct type `<ORIGINAL_STRUCT><UPDATE_STRUCT_NAME_SUFFIX>`,
+for e.g., `VertexAPatch` where `VertexA` is the original
+struct and `Patch` is the `UPDATE_STRUCT_NAME_SUFFIX` as defined
+in this module. `VertexA` and `VertexAPatch` have the exact same fields
 except that the `Patch` version of the struct has pointers to the
-types of the same field in the original struct.  The `Id` nodes like
-'BaseNode' or 'BaseUUIDNode' are present in both the structs
+types of the same field in the original struct.  The `ID` nodes like
+`BaseNode` or `BaseUUIDNode` are present in both the structs
 in exactly the same manner.
 ### ORIGINAL-STRUCT:
 ```go
