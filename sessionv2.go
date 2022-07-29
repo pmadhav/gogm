@@ -518,6 +518,33 @@ func (s *SessionV2Impl) DeleteStringKey(ctx context.Context, field string, key s
 	return s.runWrite(ctx, deleteByStrings(field, key))
 }
 
+func (s *SessionV2Impl) DeleteObjectsWithStringKey(ctx context.Context,
+	deleteObj interface{}, pks *PrimaryKeyStrategy) error {
+	var span opentracing.Span
+	if ctx != nil && s.gogm.config.OpentracingEnabled {
+		span, ctx = opentracing.StartSpanFromContext(ctx, "gogm.SessionV2Impl.DeleteObjectsWithStringKey")
+		defer span.Finish()
+	} else {
+		span = nil
+	}
+
+	if s.neoSess == nil {
+		return errors.New("neo4j connection not initialized")
+	}
+
+	if deleteObj == nil {
+		return errors.New("deleteObj can not be nil")
+	}
+
+	// handle if in transaction
+	workFunc, err := deleteNodeWithStringKey(deleteObj, pks.FieldName, pks.DBName)
+	if err != nil {
+		return fmt.Errorf("failed to generate work func for delete, %w", err)
+	}
+
+	return s.runWrite(ctx, workFunc)
+}
+
 func (s *SessionV2Impl) runWrite(ctx context.Context, work neo4j.TransactionWork) error {
 	var span opentracing.Span
 	if ctx != nil && s.gogm.config.OpentracingEnabled {

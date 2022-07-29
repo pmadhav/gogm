@@ -76,6 +76,55 @@ func deleteNode(deleteObj interface{}) (neo4j.TransactionWork, error) {
 	return deleteByIds(ids...), nil
 }
 
+// deleteNode is used to remove nodes from the database
+func deleteNodeWithStringKey(deleteObj interface{}, field string, dbName string) (neo4j.TransactionWork, error) {
+	rawType := reflect.TypeOf(deleteObj)
+
+	if rawType.Kind() != reflect.Ptr && rawType.Kind() != reflect.Slice {
+		return nil, errors.New("delete obj can only be ptr or slice")
+	}
+
+	var ids []string
+
+	if rawType.Kind() == reflect.Ptr {
+		delValue := reflect.ValueOf(deleteObj).Elem()
+		id, ok := delValue.FieldByName(field).Interface().(string)
+		if !ok {
+			return nil, errors.New("unable to cast id to int64")
+		}
+
+		ids = append(ids, id)
+	} else {
+		slType := rawType.Elem()
+
+		extraElem := false
+
+		if slType.Kind() == reflect.Ptr {
+			extraElem = true
+		}
+
+		slVal := reflect.ValueOf(deleteObj)
+
+		slLen := slVal.Len()
+
+		for i := 0; i < slLen; i++ {
+			val := slVal.Index(i)
+			if extraElem {
+				val = val.Elem()
+			}
+
+			id, ok := val.FieldByName(field).Interface().(string)
+			if !ok {
+				return nil, errors.New("unable to cast id to string")
+			}
+
+			ids = append(ids, id)
+		}
+	}
+
+	return deleteByStrings(dbName, ids...), nil
+}
+
 // deleteByIds deletes node by graph ids
 func deleteByIds(ids ...int64) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {

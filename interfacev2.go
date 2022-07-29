@@ -94,6 +94,9 @@ type ogmFunctions interface {
 	//delete string key
 	DeleteStringKey(ctx context.Context, field string, key string) error
 
+	//delete object with string key type
+	DeleteObjectsWithStringKey(ctx context.Context, deleteObj interface{}, pks *PrimaryKeyStrategy) error
+
 	//specific query, responds to slice and single objects
 	Query(ctx context.Context, query string, properties map[string]interface{}, respObj interface{}) error
 
