@@ -64,12 +64,12 @@ func deleteNode(deleteObj interface{}) (neo4j.TransactionWork, error) {
 				val = val.Elem()
 			}
 
-			id, ok := val.FieldByName("Id").Interface().(int64)
+			id, ok := val.FieldByName("Id").Interface().(*int64)
 			if !ok {
 				return nil, errors.New("unable to cast id to int64")
 			}
 
-			ids = append(ids, id)
+			ids = append(ids, *id)
 		}
 	}
 
