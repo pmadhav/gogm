@@ -29,6 +29,10 @@ import (
 	dsl "github.com/mindstand/go-cypherdsl"
 )
 
+const (
+	UPDATE_STRUCT_NAME_SUFFIX string = "Patch"
+)
+
 func GetTypesSlice(types ...interface{}) []interface{} {
 	return types
 }
@@ -145,7 +149,11 @@ func getTypeName(val reflect.Type) (string, error) {
 	}
 
 	if val.Kind() == reflect.Struct {
-		return val.Name(), nil
+		r := val.Name()
+		// If this is an update/patch struct, remove the
+		// suffix and send the remainder as the TypeName
+		r = strings.TrimSuffix(r, UPDATE_STRUCT_NAME_SUFFIX)
+		return r, nil
 	} else {
 		return "", fmt.Errorf("can not take name from kind {%s)", val.Kind().String())
 	}
@@ -187,12 +195,22 @@ func toCypherParamsMap(gogm *Gogm, val reflect.Value, config structDecoratorConf
 				return nil, fmt.Errorf("properties type is not a map or slice, %T", field.Interface())
 			}
 		} else {
-			var val interface{}
-			//check if field is type aliased
-			if conf.IsTypeDef {
+			var val interface{} = field.Interface()
+			var isNilPtr bool = false
+			// If the field value is of a pointer type and tie value
+			// is nil, then we mark it so in `isNilPtr` and then we do
+			// not add it to the `ret` map for saving/updating.
+			if reflect.TypeOf(val).Kind() == reflect.Ptr {
+				if reflect.ValueOf(val).IsNil() {
+					isNilPtr = true
+				} else if conf.IsTypeDef {
+					//check if field is type aliased
+					v := reflect.Indirect(field)
+					val = v.Convert(conf.TypedefActual).Interface
+				}
+			} else if conf.IsTypeDef {
+				//check if field is type aliased
 				val = field.Convert(conf.TypedefActual).Interface()
-			} else {
-				val = field.Interface()
 			}
 
 			if conf.PrimaryKey != "" {
@@ -204,7 +222,10 @@ func toCypherParamsMap(gogm *Gogm, val reflect.Value, config structDecoratorConf
 				pks := gogm.GetPrimaryKeyStrategy(config.Type.Name())
 				ret[pks.DBName] = val
 			} else {
-				ret[conf.Name] = val
+				// Only update the map if this is not a pointer field with nil value.
+				if !isNilPtr {
+					ret[conf.Name] = val
+				}
 			}
 		}
 	}

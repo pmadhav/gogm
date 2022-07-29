@@ -105,6 +105,65 @@ type MyNeo4jObject struct {
 }
 
 ```
+## Updating values
+In case of updates to an object, if the original
+struct is passed, then all the fields of the
+of the struct get updated. If we do not have the
+original object with the original values, then the existing
+values get overwritten by 'nil' values for the field type. To avoid this,
+we can use a struct type `<ORIGINAL_STRUCT><UPDATE_STRUCT_NAME_SUFFIX>`,
+for e.g., 'VertexAPatch' where 'VertexA' is theoriginal
+struct and 'Patch' is the `UPDATE_STRUCT_NAME_SUFFIX` as defined
+in this module. 'VertexA' and 'VertexAPatch' have the exact same fields
+except that the `Patch` version of the struct has pointers to the
+types of the same field in the original struct.  The `Id` nodes like
+'BaseNode' or 'BaseUUIDNode' are present in both the structs
+in exactly the same manner.
+### ORIGINAL-STRUCT:
+```go
+type VertexA struct {
+	// provides required node fields
+	gogm.BaseUUIDNode
+
+	IsSet             bool              `gogm:"name=is_set"`
+	TestField         string            `gogm:"name=test_field"`
+	TestTypeDefString tdString          `gogm:"name=test_type_def_string"`
+	TestTypeDefInt    tdInt             `gogm:"name=test_type_def_int"`
+	MapProperty       map[string]string `gogm:"name=map_property;properties"`
+	SliceProperty     []string          `gogm:"name=slice_property;properties"`
+	SingleA           *VertexB          `gogm:"direction=incoming;relationship=test_rel"`
+	ManyA             []*VertexB        `gogm:"direction=incoming;relationship=testm2o"`
+	MultiA            []*VertexB        `gogm:"direction=incoming;relationship=multib"`
+	SingleSpecA       *EdgeC            `gogm:"direction=outgoingrelationship=special_single"`
+	MultiSpecA        []*EdgeC          `gogm:"direction=outgoing;relationship=special_multi"`
+}
+```
+
+### PATCH-STRUCT:
+Some things to keep in mind when making the Patch struct:
+1. The patch struct fields do not need the `gogm` annotations
+2. Primitive types should be pointer to those types, like `IsSet` and `TestField` below
+3. typedef'ed fields of primitive types do not need like int, bool, string, etc. do not need a `Patch` version. You can simply use a pointer to the typedef'ed type like `TestTypeDefString` and `TestTypeDefInt` below
+4. Any map or slices of basic types should also be pointers to those exact same types like `MapProperty` and `SliceProperty` below.
+5. Any pointer to a struct or a slice of pointers to a struct should be updated to the 'Patch' structs instead of the original structs like `SingleA`, `ManyA`, `MultiA`, `SingleSpecA` and `MultiSpecA` below.
+```go
+type VertexAPatch struct {
+	// provides required node fields
+	gogm.BaseUUIDNode // The base ID nodes remain the same in both the structs
+
+	IsSet             *bool
+	TestField         *string
+	TestTypeDefString *tdString
+	TestTypeDefInt    *tdInt
+	MapProperty       *map[string]string
+	SliceProperty     *[]string
+	SingleA           *VertexBPatch
+	ManyA             []*VertexBPatch
+	MultiA            []*VertexBPatch
+	SingleSpecA       *EdgeCPatch
+	MultiSpecA        []*EdgeCPatch
+}
+```
 
 ### GOGM Usage
 - Edges must implement the [Edge interface](https://github.com/mindstand/gogm/blob/master/interface.go#L28). View the complete example [here](https://github.com/mindstand/gogm/blob/master/examples/example.go). 
@@ -124,7 +183,7 @@ type VertexA struct {
 	// provides required node fields
 	gogm.BaseNode
 
-    TestField         string                `gogm:"name=test_field"`
+	TestField         string            `gogm:"name=test_field"`
 	TestTypeDefString tdString          `gogm:"name=test_type_def_string"`
 	TestTypeDefInt    tdInt             `gogm:"name=test_type_def_int"`
 	MapProperty       map[string]string `gogm:"name=map_property;properties"`
