@@ -114,7 +114,7 @@ func deleteByUuids(ids ...string) neo4j.TransactionWork {
 func deleteByStrings(field string, ids ...string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		cyp, err := dsl.QB().
-			Cypher("UNWIND {rows} as row").
+			Cypher("UNWIND $rows as row").
 			Match(dsl.Path().V(dsl.V{Name: "n"}).Build()).
 			Where(dsl.C(&dsl.ConditionConfig{
 				Name:              "n",
