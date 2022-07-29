@@ -171,7 +171,7 @@ func main() {
 		Username:                  "neo4j",
 		Password:                  "password",
 		PoolSize:                  50,
-		IndexStrategy:             gogm.VALIDATE_INDEX, //other options are ASSERT_INDEX and IGNORE_INDEX
+		IndexStrategy:             gogm.VALIDATE_INDEX, //other options are CREATE_INDEX, ASSERT_INDEX and IGNORE_INDEX
 		TargetDbs:                 nil,
 		// default logger wraps the go "log" package, implement the Logger interface from gogm to use your own logger
 		Logger:             gogm.GetDefaultLogger(),
@@ -241,7 +241,7 @@ func main() {
 Initialization in gogm v1
 ```go
 config := gogm.Config{
-    IndexStrategy: gogm.VALIDATE_INDEX, //other options are ASSERT_INDEX and IGNORE_INDEX
+    IndexStrategy: gogm.VALIDATE_INDEX, //other options are CREATE_INDEX, ASSERT_INDEX and IGNORE_INDEX
     PoolSize:      50,
     Port:          7687,
     IsCluster:     false, //tells it whether or not to use `bolt+routing`
@@ -260,7 +260,7 @@ Equivalent in GoGM v2
 ```go
 // define your configuration
 config := gogm.Config{
-    IndexStrategy: gogm.VALIDATE_INDEX, //other options are ASSERT_INDEX and IGNORE_INDEX
+    IndexStrategy: gogm.VALIDATE_INDEX, //other options are CREATE_INDEX, ASSERT_INDEX and IGNORE_INDEX
     PoolSize:      50,
     Port:          7687,
     IsCluster:     false, //tells it whether or not to use `bolt+routing`
