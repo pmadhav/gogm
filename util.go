@@ -206,7 +206,7 @@ func toCypherParamsMap(gogm *Gogm, val reflect.Value, config structDecoratorConf
 				} else if conf.IsTypeDef {
 					//check if field is type aliased
 					v := reflect.Indirect(field)
-					val = v.Convert(conf.TypedefActual).Interface
+					val = v.Convert(conf.TypedefActual).Interface()
 				}
 			} else if conf.IsTypeDef {
 				//check if field is type aliased
