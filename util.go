@@ -76,7 +76,7 @@ func ptrToBool(b bool) *bool {
 }
 
 // sets uuid for stuct if uuid field is empty
-func handleNodeState(pkStrat *PrimaryKeyStrategy, val *reflect.Value) (isNew bool, id int64, relConfig map[string]*RelationConfig, err error) {
+func handleNodeState(pkStrat *PrimaryKeyStrategy, isPatch bool, val *reflect.Value) (isNew bool, id int64, relConfig map[string]*RelationConfig, err error) {
 	if val == nil {
 		return false, -1, nil, errors.New("value can not be nil")
 	}
@@ -120,7 +120,10 @@ func handleNodeState(pkStrat *PrimaryKeyStrategy, val *reflect.Value) (isNew boo
 	// using a pk strategy on top of default graph ids
 	if pkStrat.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
 		checkId := reflect.Indirect(*val).FieldByName(pkStrat.FieldName)
-		if !checkId.IsZero() && !isNew {
+		if !checkId.IsZero() && (!isNew || isPatch) {
+			if isNew {
+				id = -1
+			}
 			return false, id, loadMap, nil
 		} else {
 			// if id was not set by user, gen new id and set it
@@ -136,7 +139,8 @@ func handleNodeState(pkStrat *PrimaryKeyStrategy, val *reflect.Value) (isNew boo
 }
 
 // gets the type name from reflect type
-func getTypeName(val reflect.Type) (string, error) {
+func getTypeName(val reflect.Type) (string, bool, error) {
+	isPatch := false
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
@@ -152,10 +156,13 @@ func getTypeName(val reflect.Type) (string, error) {
 		r := val.Name()
 		// If this is an update/patch struct, remove the
 		// suffix and send the remainder as the TypeName
-		r = strings.TrimSuffix(r, UPDATE_STRUCT_NAME_SUFFIX)
-		return r, nil
+		if strings.HasSuffix(r, UPDATE_STRUCT_NAME_SUFFIX) {
+			isPatch = true
+			r = strings.TrimSuffix(r, UPDATE_STRUCT_NAME_SUFFIX)
+		}
+		return r, isPatch, nil
 	} else {
-		return "", fmt.Errorf("can not take name from kind {%s)", val.Kind().String())
+		return "", false, fmt.Errorf("can not take name from kind {%s)", val.Kind().String())
 	}
 }
 

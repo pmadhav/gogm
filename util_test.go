@@ -30,18 +30,18 @@ import (
 func TestSetUuidIfNeeded(t *testing.T) {
 	val := &a{}
 
-	_, _, _, err := handleNodeState(nil, nil)
+	_, _, _, err := handleNodeState(nil, false, nil)
 	require.NotNil(t, err)
 
 	v := reflect.ValueOf(val)
-	isNew, _, _, err := handleNodeState(UUIDPrimaryKeyStrategy, &v)
+	isNew, _, _, err := handleNodeState(UUIDPrimaryKeyStrategy, false, &v)
 	require.Nil(t, err)
 	require.True(t, isNew)
 
 	val.UUID = "dasdfasd"
 
 	v = reflect.ValueOf(val)
-	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, &v)
+	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, false, &v)
 	require.Nil(t, err)
 	require.True(t, isNew)
 
@@ -49,7 +49,7 @@ func TestSetUuidIfNeeded(t *testing.T) {
 	val.LoadMap = map[string]*RelationConfig{}
 
 	v = reflect.ValueOf(val)
-	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, &v)
+	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, false, &v)
 	require.Nil(t, err)
 	require.True(t, isNew)
 
@@ -57,7 +57,7 @@ func TestSetUuidIfNeeded(t *testing.T) {
 	val.LoadMap = nil
 
 	v = reflect.ValueOf(val)
-	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, &v)
+	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, false, &v)
 	require.Nil(t, err)
 	require.True(t, isNew)
 
@@ -71,7 +71,7 @@ func TestSetUuidIfNeeded(t *testing.T) {
 	}
 
 	v = reflect.ValueOf(val)
-	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, &v)
+	isNew, _, _, err = handleNodeState(UUIDPrimaryKeyStrategy, false, &v)
 	require.Nil(t, err)
 	require.False(t, isNew)
 
@@ -80,13 +80,13 @@ func TestSetUuidIfNeeded(t *testing.T) {
 func TestGetTypeName(t *testing.T) {
 	val := &a{}
 
-	name, err := getTypeName(reflect.TypeOf(val))
+	name, _, err := getTypeName(reflect.TypeOf(val))
 	require.Nil(t, err)
 	require.EqualValues(t, "a", name)
 
 	val1 := []a{}
 
-	name, err = getTypeName(reflect.TypeOf(val1))
+	name, _, err = getTypeName(reflect.TypeOf(val1))
 	require.Nil(t, err)
 	require.EqualValues(t, "a", name)
 }
