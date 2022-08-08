@@ -127,7 +127,7 @@ func decode(gogm *Gogm, result neo4j.Result, respObj interface{}) (err error) {
 	}
 
 	if len(strictRels) != 0 {
-		err = sortStrictRels(strictRels, labelLookup, rels)
+		err = sortStrictRels(gogm, strictRels, labelLookup, rels)
 		if err != nil {
 			return err
 		}
@@ -143,6 +143,12 @@ func decode(gogm *Gogm, result neo4j.Result, respObj interface{}) (err error) {
 		if relationConfig.StartNodeType == "" || relationConfig.EndNodeType == "" {
 			continue
 		}
+
+		// if relationConfig.EndNodeType == primaryLabel {
+		// 	// If there is a relationship pointing to the primaryLabel type
+		// 	// then we skip that.
+		// 	continue
+		// }
 
 		//grab reflect value for start
 		start, _, err := getValueAndConfig(gogm, relationConfig.StartNodeId, relationConfig.StartNodeType, nodeLookup)
@@ -175,7 +181,7 @@ func decode(gogm *Gogm, result neo4j.Result, respObj interface{}) (err error) {
 				}
 
 				newConf := &RelationConfig{
-					Ids:          []int64{relationConfig.EndNodeId},
+					Ids:          []interface{}{relationConfig.EndNodeId},
 					RelationType: rt,
 				}
 
@@ -198,7 +204,7 @@ func decode(gogm *Gogm, result neo4j.Result, respObj interface{}) (err error) {
 				}
 
 				newConf := &RelationConfig{
-					Ids:          []int64{relationConfig.StartNodeId},
+					Ids:          []interface{}{relationConfig.StartNodeId},
 					RelationType: rt,
 				}
 
@@ -412,7 +418,7 @@ func sortIsolatedNodes(gogm *Gogm, isolatedNodes []neo4j.Node, labelLookup map[i
 }
 
 // sortStrictRels sorts relationships that are strictly defined (i.e direction is pre defined) from the bolt driver
-func sortStrictRels(strictRels []neo4j.Relationship, labelLookup map[int64]string, rels map[int64]*neoEdgeConfig) error {
+func sortStrictRels(gogm *Gogm, strictRels []neo4j.Relationship, labelLookup map[int64]string, rels map[int64]*neoEdgeConfig) error {
 	if strictRels == nil {
 		return fmt.Errorf("paths is empty, that shouldn't have happened, %w", ErrInternal)
 	}
@@ -426,7 +432,8 @@ func sortStrictRels(strictRels []neo4j.Relationship, labelLookup map[int64]strin
 
 			endLabel, ok := labelLookup[rel.EndId]
 			if !ok {
-				return fmt.Errorf("label not found for node [%v], %w", rel.EndId, ErrInternal)
+				gogm.logger.Debugf("label not found for node [%v], skipping rel [%v]", rel.EndId, rel.Id)
+				continue
 			}
 
 			rels[rel.Id] = &neoEdgeConfig{

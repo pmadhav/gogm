@@ -71,12 +71,22 @@ func int64SliceContains(s []int64, e int64) bool {
 	return false
 }
 
+// checks if integer is in slice
+func interfaceSliceContains(s []interface{}, e interface{}) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 func ptrToBool(b bool) *bool {
 	return &b
 }
 
 // sets uuid for stuct if uuid field is empty
-func handleNodeState(pkStrat *PrimaryKeyStrategy, isPatch bool, val *reflect.Value) (isNew bool, id int64, relConfig map[string]*RelationConfig, err error) {
+func handleNodeState(pkStrat *PrimaryKeyStrategy, isPatch bool, val *reflect.Value) (isNew bool, id interface{}, relConfig map[string]*RelationConfig, err error) {
 	if val == nil {
 		return false, -1, nil, errors.New("value can not be nil")
 	}
@@ -121,17 +131,16 @@ func handleNodeState(pkStrat *PrimaryKeyStrategy, isPatch bool, val *reflect.Val
 	if pkStrat.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
 		checkId := reflect.Indirect(*val).FieldByName(pkStrat.FieldName)
 		if !checkId.IsZero() && (!isNew || isPatch) {
-			if isNew {
-				id = -1
-			}
-			return false, id, loadMap, nil
+			return false, checkId.String(), loadMap, nil
 		} else {
 			// if id was not set by user, gen new id and set it
+			var tmpPK interface{}
 			if checkId.IsZero() {
-				reflect.Indirect(*val).FieldByName(pkStrat.FieldName).Set(reflect.ValueOf(pkStrat.GenIDFunc()))
+				tmpPK = pkStrat.GenIDFunc()
+				reflect.Indirect(*val).FieldByName(pkStrat.FieldName).Set(reflect.ValueOf(tmpPK))
 			}
 
-			return true, -1, loadMap, nil
+			return true, tmpPK, loadMap, nil
 		}
 	} else {
 		return isNew, id, loadMap, nil

@@ -296,6 +296,9 @@ func newDecoratorConfig(gogm *Gogm, decorator, name string, varType reflect.Type
 				if pk.StrategyName == val {
 					toReturn.Name = pk.DBName
 					toReturn.FieldName = pk.FieldName
+				} else if val == DefaultPrimaryKeyStrategy.StrategyName {
+					toReturn.Name = DefaultPrimaryKeyStrategy.DBName
+					toReturn.FieldName = DefaultPrimaryKeyStrategy.FieldName
 				}
 				continue
 			case relationshipNameField:

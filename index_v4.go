@@ -48,6 +48,7 @@ func buildConstraintQuery(unique bool, name, nodeType, field string) string {
 		cyp += fmt.Sprintf(notUniquePart, name, field)
 	}
 
+	// fmt.Println(cyp)
 	return cyp
 }
 
@@ -58,7 +59,9 @@ func buildIndexQuery(indexType string, fields ...string) string {
 		query += fmt.Sprintf("n.%s,", field)
 	}
 
-	return strings.TrimSuffix(query, ",") + ")"
+	s := strings.TrimSuffix(query, ",") + ")"
+	// fmt.Println(s)
+	return s
 }
 
 func resultToStringArrV4(isConstraint bool, result [][]interface{}) ([]string, error) {

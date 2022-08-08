@@ -213,7 +213,7 @@ func expandBootstrap(gogm *Gogm, variable, label string, depth int) (string, err
 			clause += ", ["
 		}
 
-		expanded, err := expand(gogm, variable, label, rels, 1, depth-1)
+		expanded, err := expand(gogm, variable, label, rels, 1, depth-1, label)
 		if err != nil {
 			return "", err
 		}
@@ -227,7 +227,7 @@ func expandBootstrap(gogm *Gogm, variable, label string, depth int) (string, err
 	return clause, nil
 }
 
-func expand(gogm *Gogm, variable, label string, rels []decoratorConfig, level, depth int) (string, error) {
+func expand(gogm *Gogm, variable, label string, rels []decoratorConfig, level, depth int, topLabel string) (string, error) {
 	clause := ""
 
 	for i, rel := range rels {
@@ -236,7 +236,7 @@ func expand(gogm *Gogm, variable, label string, rels []decoratorConfig, level, d
 			clause += ", "
 		}
 
-		ret, err := listComprehension(gogm, variable, label, rel, level, depth)
+		ret, err := listComprehension(gogm, variable, label, rel, level, depth, topLabel)
 		if err != nil {
 			return "", err
 		}
@@ -259,7 +259,8 @@ func relString(variable string, rel decoratorConfig) string {
 	return fmt.Sprintf("%s[%s:%s]%s", start, variable, rel.Relationship, end)
 }
 
-func listComprehension(gogm *Gogm, fromNodeVar, label string, rel decoratorConfig, level, depth int) (string, error) {
+func listComprehension(gogm *Gogm, fromNodeVar, label string, rel decoratorConfig, level, depth int, topLabel string) (string, error) {
+	var skipTraverse bool = false
 	relVar := fmt.Sprintf("r_%c_%d", rel.Relationship[0], level)
 
 	toNodeType := rel.Type.Elem()
@@ -274,16 +275,28 @@ func listComprehension(gogm *Gogm, fromNodeVar, label string, rel decoratorConfi
 
 	toNodeVar := fmt.Sprintf("n_%c_%d", toNodeLabel[0], level)
 
-	clause := fmt.Sprintf("[(%s)%s(%s:%s) | [%s, %s", fromNodeVar, relString(relVar, rel), toNodeVar, toNodeLabel, relVar, toNodeVar)
+	// clause := fmt.Sprintf("[(%s)%s(%s:%s) | [%s, %s", fromNodeVar, relString(relVar, rel), toNodeVar, toNodeLabel, relVar, toNodeVar)
+	clause := fmt.Sprintf("[(%s)%s(%s:%s) | [%s", fromNodeVar, relString(relVar, rel), toNodeVar, toNodeLabel, relVar)
 
-	if depth > 0 {
+	// If the depth is greater than 0, then we should not
+	// send back the nested nodes that match the original node
+	// type otherwise it messes up pagination
+	if toNodeLabel != topLabel {
+		clause += fmt.Sprintf(", %s", toNodeVar)
+	} else {
+		// else if the 'toNodeLabel' matches the topLabel, then
+		// skip traversing that that node too
+		skipTraverse = true
+	}
+
+	if !skipTraverse && depth > 0 {
 		toNodeRels, err := getRelationshipsForLabel(gogm, toNodeLabel)
 		if err != nil {
 			return "", err
 		}
 
 		if len(toNodeRels) > 0 {
-			toNodeExpansion, err := expand(gogm, toNodeVar, toNodeLabel, toNodeRels, level+1, depth-1)
+			toNodeExpansion, err := expand(gogm, toNodeVar, toNodeLabel, toNodeRels, level+1, depth-1, topLabel)
 			if err != nil {
 				return "", err
 			}

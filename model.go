@@ -52,7 +52,7 @@ const (
 // RelationConfig specifies how relationships are loaded
 type RelationConfig struct {
 	// stores graph ids
-	Ids []int64 `json:"-" gomg:"-"`
+	Ids []interface{} `json:"-" gomg:"-"`
 	// specifies relationship type
 	RelationType RelationType `json:"-"  gomg:"-"`
 }

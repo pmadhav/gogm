@@ -382,6 +382,7 @@ func (s *SessionV2Impl) LoadAllDepthFilterPagination(ctx context.Context, respOb
 		return err
 	}
 
+	// fmt.Printf("LOAD QUERY: %s\n", cyp)
 	return s.runReadOnly(ctx, cyp, params, respObj)
 }
 

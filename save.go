@@ -36,7 +36,7 @@ type nodeCreate struct {
 	// type to save by
 	Type reflect.Type
 	// Id
-	Id int64
+	Id interface{}
 	// Pointer value (if id is not yet set)
 	Pointer uintptr
 	// whether the node is new or not
@@ -91,9 +91,9 @@ func saveDepth(gogm *Gogm, obj interface{}, depth int) neo4j.TransactionWork {
 			// node id -- [field] config
 			oldRels = map[uintptr]map[string]*RelationConfig{}
 			// node id -- [field] config
-			curRels = map[int64]map[string]*RelationConfig{}
+			curRels = map[interface{}]map[string]*RelationConfig{}
 			// id to reflect value
-			nodeIdRef = map[uintptr]int64{}
+			nodeIdRef = map[uintptr]interface{}{}
 			// uintptr to reflect value (for new nodes that dont have a graph id yet)
 			nodeRef = map[uintptr]*reflect.Value{}
 		)
@@ -148,7 +148,7 @@ func saveDepth(gogm *Gogm, obj interface{}, depth int) neo4j.TransactionWork {
 		}
 
 		if len(relations) != 0 {
-			err := relateNodes(tx, relations, nodeIdRef)
+			err := relateNodes(tx, relations, nodeIdRef, nodeRef)
 			if err != nil {
 				return nil, err
 			}
@@ -158,8 +158,37 @@ func saveDepth(gogm *Gogm, obj interface{}, depth int) neo4j.TransactionWork {
 	}
 }
 
+func getNodeId(nodeRef map[uintptr]*reflect.Value, lookup map[uintptr]interface{}, nodePtr uintptr) (interface{}, error) {
+	tmpId, ok := lookup[nodePtr]
+	if !ok {
+		return nil, fmt.Errorf("graph id not found for ptr %v", nodePtr)
+	}
+
+	var actualId interface{}
+	var ok2 bool
+
+	actualId, ok2 = tmpId.(string)
+	if ok2 {
+		// For nodes with string keys, we try to find the internal neo4j int64 id
+		nodeVal := nodeRef[nodePtr]
+		pkVal := nodeVal.FieldByName(DefaultPrimaryKeyStrategy.FieldName)
+
+		if pkVal.IsNil() {
+			return nil, fmt.Errorf("default graph id not found for ptr: %v id: %v", nodePtr, actualId)
+		}
+		if !pkVal.Elem().IsZero() {
+			id := pkVal.Elem().Int()
+			return id, nil
+		}
+	} else {
+		actualId = tmpId
+	}
+	return actualId, nil
+}
+
 // relateNodes connects nodes together using edge config
-func relateNodes(transaction neo4j.Transaction, relations map[string][]*relCreate, lookup map[uintptr]int64) error {
+func relateNodes(transaction neo4j.Transaction, relations map[string][]*relCreate,
+	lookup map[uintptr]interface{}, nodeRef map[uintptr]*reflect.Value) error {
 	if len(relations) == 0 {
 		return errors.New("relations can not be nil or empty")
 	}
@@ -173,13 +202,13 @@ func relateNodes(transaction neo4j.Transaction, relations map[string][]*relCreat
 
 		for _, rel := range rels {
 			// grab start id
-			startId, ok := lookup[rel.StartNodePtr]
-			if !ok {
+			startId, err := getNodeId(nodeRef, lookup, rel.StartNodePtr)
+			if err != nil {
 				return fmt.Errorf("graph id not found for ptr %v", rel.StartNodePtr)
 			}
 
-			endId, ok := lookup[rel.EndNodePtr]
-			if !ok {
+			endId, err := getNodeId(nodeRef, lookup, rel.EndNodePtr)
+			if err != nil {
 				return fmt.Errorf("graph id not found for ptr %v", rel.EndNodePtr)
 			}
 
@@ -263,7 +292,7 @@ func relateNodes(transaction neo4j.Transaction, relations map[string][]*relCreat
 }
 
 // removes relationships between specified nodes
-func removeRelations(transaction neo4j.Transaction, dels map[int64][]int64) error {
+func removeRelations(transaction neo4j.Transaction, dels map[interface{}][]interface{}) error {
 	if len(dels) == 0 {
 		return nil
 	}
@@ -320,12 +349,12 @@ func removeRelations(transaction neo4j.Transaction, dels map[int64][]int64) erro
 }
 
 // calculates which relationships to delete
-func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[int64]map[string]*RelationConfig, lookup map[uintptr]int64) (map[int64][]int64, error) {
+func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[interface{}]map[string]*RelationConfig, lookup map[uintptr]interface{}) (map[interface{}][]interface{}, error) {
 	if len(oldRels) == 0 {
-		return map[int64][]int64{}, nil
+		return map[interface{}][]interface{}{}, nil
 	}
 
-	dels := map[int64][]int64{}
+	dels := map[interface{}][]interface{}{}
 
 	for ptr, oldRelConf := range oldRels {
 		oldId, ok := lookup[ptr]
@@ -350,14 +379,14 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[i
 					//check if this id is new rels in the same location
 					if deleteAllRels || deleteAllRelsOnField {
 						if _, ok := dels[oldId]; !ok {
-							dels[oldId] = []int64{id}
+							dels[oldId] = []interface{}{id}
 						} else {
 							dels[oldId] = append(dels[oldId], id)
 						}
 					} else {
-						if !int64SliceContains(curConf.Ids, id) {
+						if !interfaceSliceContains(curConf.Ids, id) {
 							if _, ok := dels[oldId]; !ok {
-								dels[oldId] = []int64{id}
+								dels[oldId] = []interface{}{id}
 							} else {
 								dels[oldId] = append(dels[oldId], id)
 							}
@@ -371,7 +400,7 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[i
 	return dels, nil
 }
 
-func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, currentDepth, maxDepth int, curRels map[int64]map[string]*RelationConfig) error {
+func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, currentDepth, maxDepth int, curRels map[interface{}]map[string]*RelationConfig) error {
 	if currentDepth > maxDepth {
 		return nil
 	}
@@ -383,17 +412,35 @@ func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, curr
 		return nil
 	}
 
-	idVal := reflect.Indirect(*current).FieldByName(DefaultPrimaryKeyStrategy.FieldName)
-	if idVal.IsNil() {
-		return errors.New("id not set")
+	//get the type
+	nodeType, _, err := getTypeName(current.Type())
+	if err != nil {
+		return err
 	}
 
-	var id int64
+	// Get the PKS given the nodeType
+	pks := gogm.GetPrimaryKeyStrategy(nodeType)
 
-	if !idVal.Elem().IsZero() {
-		id = idVal.Elem().Int()
+	var idVal reflect.Value
+	var id interface{}
+
+	if pks.FieldName != DefaultPrimaryKeyStrategy.FieldName {
+		idVal = reflect.Indirect(*current).FieldByName(pks.FieldName)
+		if idVal.IsZero() {
+			return errors.New("string id not set")
+		}
+		id = idVal.String()
 	} else {
-		id = 0
+		idVal := reflect.Indirect(*current).FieldByName(DefaultPrimaryKeyStrategy.FieldName)
+		if idVal.IsNil() {
+			return errors.New("id not set")
+		}
+
+		if !idVal.Elem().IsZero() {
+			id = idVal.Elem().Int()
+		} else {
+			id = 0
+		}
 	}
 
 	if _, ok := curRels[id]; ok {
@@ -404,16 +451,10 @@ func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, curr
 		curRels[id] = map[string]*RelationConfig{}
 	}
 
-	//get the type
-	tString, _, err := getTypeName(current.Type())
-	if err != nil {
-		return err
-	}
-
 	//get the config
-	actual, ok := gogm.mappedTypes.Get(tString)
+	actual, ok := gogm.mappedTypes.Get(nodeType)
 	if !ok {
-		return fmt.Errorf("struct config not found type (%s)", tString)
+		return fmt.Errorf("struct config not found type (%s)", nodeType)
 	}
 
 	//cast the config
@@ -447,20 +488,40 @@ func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, curr
 					return err
 				}
 
-				followIdVal := reflect.Indirect(*followVal).FieldByName(DefaultPrimaryKeyStrategy.FieldName)
-				var followId int64
-				if !followIdVal.IsNil() {
-					followIdVal = followIdVal.Elem()
-					followId = followIdVal.Int()
+				var followId interface{}
+				e1 := followVal.Elem()
+
+				//get the type
+				nodeType2, _, err2 := getTypeName(followVal.Type())
+				if err2 != nil {
+					return err2
+				}
+
+				// Get the PKS given the nodeType
+				pks2 := gogm.GetPrimaryKeyStrategy(nodeType2)
+
+				followIdVal := e1.FieldByName(pks2.FieldName)
+				if pks2.FieldName != DefaultPrimaryKeyStrategy.FieldName {
+					if !followIdVal.IsZero() {
+						followId = followIdVal.String()
+					} else {
+						// should not be nil, just skip this one
+						continue
+					}
 				} else {
-					// should not be nil, just skip this one
-					continue
+					if !followIdVal.IsNil() {
+						followIdVal = followIdVal.Elem()
+						followId = followIdVal.Int()
+					} else {
+						// should not be nil, just skip this one
+						continue
+					}
 				}
 
 				//check the config is there for the specified field
 				if _, ok = curRels[id][conf.FieldName]; !ok {
 					curRels[id][conf.FieldName] = &RelationConfig{
-						Ids:          []int64{},
+						Ids:          []interface{}{},
 						RelationType: Multi,
 					}
 				}
@@ -480,20 +541,40 @@ func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, curr
 				return err
 			}
 
-			followIdVal := reflect.Indirect(*followVal).FieldByName(DefaultPrimaryKeyStrategy.FieldName)
-			var followId int64
-			if !followIdVal.IsNil() {
-				followIdVal = followIdVal.Elem()
-				followId = followIdVal.Int()
+			var followId interface{}
+			e1 := followVal.Elem()
+
+			//get the type
+			nodeType2, _, err2 := getTypeName(followVal.Type())
+			if err2 != nil {
+				return err2
+			}
+
+			// Get the PKS given the nodeType
+			pks2 := gogm.GetPrimaryKeyStrategy(nodeType2)
+
+			followIdVal := e1.FieldByName(pks2.FieldName)
+			if pks2.FieldName != DefaultPrimaryKeyStrategy.FieldName {
+				if !followIdVal.IsZero() {
+					followId = followIdVal.String()
+				} else {
+					// should not be nil, just skip this one
+					continue
+				}
 			} else {
-				// should not be nil, just skip this one
-				continue
+				if !followIdVal.IsNil() {
+					followIdVal = followIdVal.Elem()
+					followId = followIdVal.Int()
+				} else {
+					// should not be nil, just skip this one
+					continue
+				}
 			}
 
 			//check the config is there for the specified field
 			if _, ok = curRels[id][conf.FieldName]; !ok {
 				curRels[id][conf.FieldName] = &RelationConfig{
-					Ids:          []int64{},
+					Ids:          []interface{}{},
 					RelationType: Single,
 				}
 			}
@@ -513,7 +594,7 @@ func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, curr
 }
 
 // createNodes updates existing nodes and creates new nodes while also making a lookup table for ptr -> neoid
-func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]map[uintptr]*nodeCreate, nodeRef map[uintptr]*reflect.Value, nodeIdRef map[uintptr]int64) error {
+func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]map[uintptr]*nodeCreate, nodeRef map[uintptr]*reflect.Value, nodeIdRef map[uintptr]interface{}) error {
 	for label, nodes := range crNodes {
 		// used when the id of the node hasn't been set yet
 		var i uint64 = 0
@@ -532,11 +613,25 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 				row["i"] = fmt.Sprintf("%d", i)
 				updateRows = append(updateRows, row)
 			} else if id, ok := nodeIdRef[ptr]; ok {
-				row["obj"] = config.Params
-				row["key_field"] = "id"
-				row["id"] = id
+				var intId int64
+				var strId string
+				if intId, ok = id.(int64); ok {
+					row["obj"] = config.Params
+					row["key_field"] = "id"
+					row["id"] = intId
+				} else if strId, ok = id.(string); ok {
+					row[config.PKS.DBName] = strId
+					delete(config.Params, config.PKS.DBName)
+					row["obj"] = config.Params
+					row["key_field"] = config.PKS.DBName
+					row["i"] = fmt.Sprintf("%d", i)
+				}
 				updateRows = append(updateRows, row)
 			} else {
+				if config.PKS.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
+					row[config.PKS.DBName] = config.Params[config.PKS.DBName]
+					row["key_field"] = config.PKS.DBName
+				}
 				row["obj"] = config.Params
 				row["i"] = fmt.Sprintf("%d", i)
 				newRows = append(newRows, row)
@@ -548,20 +643,46 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 
 		// create new stuff
 		if len(newRows) != 0 {
-			cyp, err := dsl.QB().
-				Cypher("UNWIND $rows as row").
-				Cypher(fmt.Sprintf("CREATE(n:`%s`)", label)).
-				Cypher("SET n += row.obj").
-				Return(false, dsl.ReturnPart{
-					Name:  "row.i",
-					Alias: "i",
-				}, dsl.ReturnPart{
-					Function: &dsl.FunctionConfig{
-						Name:   "ID",
-						Params: []interface{}{dsl.ParamString("n")},
-					},
-					Alias: "id",
-				}).
+			pks := gogm.GetPrimaryKeyStrategy(label)
+			var newC dsl.Cypher
+
+			if pks.FieldName == DefaultPrimaryKeyStrategy.FieldName {
+				newC = dsl.QB().
+					Cypher("UNWIND $rows as row").
+					Cypher(fmt.Sprintf("CREATE(n:`%s`)", label)).
+					Cypher("SET n += row.obj").
+					Return(false, dsl.ReturnPart{
+						Name:  "row.i",
+						Alias: "i",
+					}, dsl.ReturnPart{
+						Function: &dsl.FunctionConfig{
+							Name:   "ID",
+							Params: []interface{}{dsl.ParamString("n")},
+						},
+						Alias: "id",
+					})
+			} else {
+				// Make sure that we update the existing node with the given string key
+				newC = dsl.QB().
+					Cypher("UNWIND $rows as row").
+					Cypher(fmt.Sprintf("MERGE(n:`%s`{%s:row.%s})", label, pks.DBName, pks.DBName)).
+					Cypher("SET n += row.obj").
+					Return(false, dsl.ReturnPart{
+						Name:  "row.i",
+						Alias: "i",
+					}, dsl.ReturnPart{
+						Function: &dsl.FunctionConfig{
+							Name:   "ID",
+							Params: []interface{}{dsl.ParamString("n")},
+						},
+						Alias: "id",
+					}, dsl.ReturnPart{
+						Name:  fmt.Sprintf("row.%s", pks.DBName),
+						Alias: "unique_id",
+					})
+			}
+
+			cyp, err := newC.
 				ToCypher()
 			if err != nil {
 				return fmt.Errorf("failed to build query, %w", err)
@@ -578,7 +699,7 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 
 			for res.Next() {
 				row := res.Record().Values
-				if len(row) != 2 {
+				if len(row) != 2 && len(row) != 3 {
 					continue
 				}
 
@@ -604,16 +725,32 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 				// get node reference from index
 				ptr := nodesArr[i].Pointer
 
-				// update the lookup
-				nodeIdRef[ptr] = graphId
-
-				// set the new id
+				// get the node val
 				val, ok := nodeRef[ptr]
 				if !ok {
 					return fmt.Errorf("cannot find val for ptr [%d]", ptr)
 				}
 
-				reflect.Indirect(*val).FieldByName(DefaultPrimaryKeyStrategy.FieldName).Set(reflect.ValueOf(&graphId))
+				if len(row) == 3 {
+					// we only support default (int64) or string type of primary keys
+					strGraphId, ok2 := row[2].(string)
+					if !ok2 {
+						return fmt.Errorf("cannot cast row[2] to string, %w", ErrInternal)
+					}
+					// update the lookup with the string index
+					nodeIdRef[ptr] = strGraphId
+
+					// set the new string id
+					reflect.Indirect(*val).FieldByName(pks.FieldName).Set(reflect.ValueOf(strGraphId))
+					// set the new id
+					reflect.Indirect(*val).FieldByName(DefaultPrimaryKeyStrategy.FieldName).Set(reflect.ValueOf(&graphId))
+				} else {
+					// update the lookup
+					nodeIdRef[ptr] = graphId
+
+					// set the new id
+					reflect.Indirect(*val).FieldByName(DefaultPrimaryKeyStrategy.FieldName).Set(reflect.ValueOf(&graphId))
+				}
 			}
 		}
 
@@ -656,6 +793,20 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 						Params: []interface{}{dsl.ParamString("n")},
 					},
 					Alias: "id",
+				}, dsl.ReturnPart{
+					Name:  fmt.Sprintf("row.%s", pks.DBName),
+					Alias: "unique_id",
+				})
+			} else {
+				newC = newC.Return(false, dsl.ReturnPart{
+					Name:  "row.i",
+					Alias: "i",
+				}, dsl.ReturnPart{
+					Function: &dsl.FunctionConfig{
+						Name:   "ID",
+						Params: []interface{}{dsl.ParamString("n")},
+					},
+					Alias: "id",
 				})
 			}
 
@@ -676,7 +827,7 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 			if addReturn {
 				for res.Next() {
 					row := res.Record().Values
-					if len(row) != 2 {
+					if len(row) != 2 && len(row) != 3 {
 						continue
 					}
 
@@ -702,16 +853,32 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 					// get node reference from index
 					ptr := nodesArr[i].Pointer
 
-					// update the lookup
-					nodeIdRef[ptr] = graphId
-
-					// set the new id
+					// get the node val
 					val, ok := nodeRef[ptr]
 					if !ok {
 						return fmt.Errorf("cannot find val for ptr [%d]", ptr)
 					}
 
-					reflect.Indirect(*val).FieldByName(DefaultPrimaryKeyStrategy.FieldName).Set(reflect.ValueOf(&graphId))
+					if len(row) == 3 {
+						// we only support default (int64) or string type of primary keys
+						strGraphId, ok2 := row[2].(string)
+						if !ok2 {
+							return fmt.Errorf("cannot cast row[2] to string, %w", ErrInternal)
+						}
+						// update the lookup with the string index
+						nodeIdRef[ptr] = strGraphId
+
+						// set the new string id
+						reflect.Indirect(*val).FieldByName(pks.FieldName).Set(reflect.ValueOf(strGraphId))
+						// set the new id
+						reflect.Indirect(*val).FieldByName(DefaultPrimaryKeyStrategy.FieldName).Set(reflect.ValueOf(&graphId))
+					} else {
+						// update the lookup
+						nodeIdRef[ptr] = graphId
+
+						// set the new id
+						reflect.Indirect(*val).FieldByName(DefaultPrimaryKeyStrategy.FieldName).Set(reflect.ValueOf(&graphId))
+					}
 				}
 			}
 		}
@@ -723,7 +890,7 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 // parseStruct
 // we are intentionally using pointers as identifiers in this stage because graph ids are not guaranteed
 func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart bool, direction dsl.Direction, edgeParams map[string]interface{}, current *reflect.Value,
-	currentDepth, maxDepth int, nodes map[string]map[uintptr]*nodeCreate, relations map[string][]*relCreate, nodeIdLookup map[uintptr]int64, nodeRef map[uintptr]*reflect.Value, oldRels map[uintptr]map[string]*RelationConfig) error {
+	currentDepth, maxDepth int, nodes map[string]map[uintptr]*nodeCreate, relations map[string][]*relCreate, nodeIdRef map[uintptr]interface{}, nodeRef map[uintptr]*reflect.Value, oldRels map[uintptr]map[string]*RelationConfig) error {
 	//check if its done
 	if currentDepth > maxDepth {
 		return nil
@@ -805,9 +972,11 @@ func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart 
 	}
 
 	if !isNew {
-		if graphID >= 0 {
-			if _, ok := nodeIdLookup[curPtr]; !ok {
-				nodeIdLookup[curPtr] = graphID
+		intId, ok2 := graphID.(int64)
+		_, ok3 := graphID.(string)
+		if (ok2 && intId >= 0) || ok3 {
+			if _, ok := nodeIdRef[curPtr]; !ok {
+				nodeIdRef[curPtr] = graphID
 			}
 		}
 
@@ -874,7 +1043,7 @@ func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart 
 					return err
 				}
 
-				err = parseStruct(gogm, newParentId, newEdgeLabel, newParentIsStart, newDirection, newEdgeParams, followVal, currentDepth+1, maxDepth, nodes, relations, nodeIdLookup, nodeRef, oldRels)
+				err = parseStruct(gogm, newParentId, newEdgeLabel, newParentIsStart, newDirection, newEdgeParams, followVal, currentDepth+1, maxDepth, nodes, relations, nodeIdRef, nodeRef, oldRels)
 				if err != nil {
 					return err
 				}
@@ -885,7 +1054,7 @@ func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart 
 				return err
 			}
 
-			err = parseStruct(gogm, newParentId, newEdgeLabel, newParentIsStart, newDirection, newEdgeParams, followVal, currentDepth+1, maxDepth, nodes, relations, nodeIdLookup, nodeRef, oldRels)
+			err = parseStruct(gogm, newParentId, newEdgeLabel, newParentIsStart, newDirection, newEdgeParams, followVal, currentDepth+1, maxDepth, nodes, relations, nodeIdRef, nodeRef, oldRels)
 			if err != nil {
 				return err
 			}
