@@ -71,16 +71,30 @@ func saveDepth(gogm *Gogm, obj interface{}, depth int) neo4j.TransactionWork {
 
 		//validate that obj is a pointer
 		rawType := reflect.TypeOf(obj)
+		var derefType reflect.Type
 
-		if rawType.Kind() != reflect.Ptr {
-			return nil, fmt.Errorf("obj must be of type pointer, not %T", obj)
-		}
+		if rawType.Kind() == reflect.Ptr {
+			//validate that the dereference type is a struct
+			derefType = rawType.Elem()
 
-		//validate that the dereference type is a struct
-		derefType := rawType.Elem()
+			if derefType.Kind() != reflect.Struct {
+				return nil, fmt.Errorf("dereference type can not be of type %T", obj)
+			}
+		} else if rawType.Kind() == reflect.Slice {
+			//validate that the dereference type is a pointer to struct
+			tmpDT := rawType.Elem()
 
-		if derefType.Kind() != reflect.Struct {
-			return nil, fmt.Errorf("dereference type can not be of type %T", obj)
+			if tmpDT.Kind() != reflect.Ptr {
+				return nil, fmt.Errorf("dereference type of slice can not be of type %T", obj)
+			}
+			//validate that the dereference type is a pointer to struct
+			derefType = tmpDT.Elem()
+
+			if derefType.Kind() != reflect.Struct {
+				return nil, fmt.Errorf("dereference type can not be of type %T", obj)
+			}
+		} else {
+			return nil, fmt.Errorf("obj must be of type pointer or slice of pointers, not %T", obj)
 		}
 
 		var (
@@ -401,6 +415,26 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[i
 }
 
 func generateCurRels(gogm *Gogm, parentPtr uintptr, current *reflect.Value, currentDepth, maxDepth int, curRels map[interface{}]map[string]*RelationConfig) error {
+	t := reflect.TypeOf(current.Interface())
+
+	if t.Kind() == reflect.Slice {
+		i := 0
+		for i < current.Len() {
+			c := current.Index(i)
+			e := generateCurRelsInternal(gogm, parentPtr, &c, currentDepth, maxDepth, curRels)
+			if e != nil {
+				return e
+			}
+			i += 1
+		}
+
+		return nil
+	}
+
+	return generateCurRelsInternal(gogm, parentPtr, current, currentDepth, maxDepth, curRels)
+}
+
+func generateCurRelsInternal(gogm *Gogm, parentPtr uintptr, current *reflect.Value, currentDepth, maxDepth int, curRels map[interface{}]map[string]*RelationConfig) error {
 	if currentDepth > maxDepth {
 		return nil
 	}
@@ -890,6 +924,31 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 // parseStruct
 // we are intentionally using pointers as identifiers in this stage because graph ids are not guaranteed
 func parseStruct(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart bool, direction dsl.Direction, edgeParams map[string]interface{}, current *reflect.Value,
+	currentDepth, maxDepth int, nodes map[string]map[uintptr]*nodeCreate, relations map[string][]*relCreate, nodeIdRef map[uintptr]interface{}, nodeRef map[uintptr]*reflect.Value, oldRels map[uintptr]map[string]*RelationConfig) error {
+	t := reflect.TypeOf(current.Interface())
+
+	if t.Kind() == reflect.Slice {
+		i := 0
+		for i < current.Len() {
+			c := current.Index(i)
+			e := parseStructInternal(gogm, parentPtr, edgeLabel, parentIsStart, direction, edgeParams, &c, currentDepth,
+				maxDepth, nodes, relations, nodeIdRef, nodeRef, oldRels)
+			if e != nil {
+				return e
+			}
+			i += 1
+		}
+
+		return nil
+	}
+
+	return parseStructInternal(gogm, parentPtr, edgeLabel, parentIsStart, direction, edgeParams, current, currentDepth,
+		maxDepth, nodes, relations, nodeIdRef, nodeRef, oldRels)
+}
+
+// parseStruct
+// we are intentionally using pointers as identifiers in this stage because graph ids are not guaranteed
+func parseStructInternal(gogm *Gogm, parentPtr uintptr, edgeLabel string, parentIsStart bool, direction dsl.Direction, edgeParams map[string]interface{}, current *reflect.Value,
 	currentDepth, maxDepth int, nodes map[string]map[uintptr]*nodeCreate, relations map[string][]*relCreate, nodeIdRef map[uintptr]interface{}, nodeRef map[uintptr]*reflect.Value, oldRels map[uintptr]map[string]*RelationConfig) error {
 	//check if its done
 	if currentDepth > maxDepth {
