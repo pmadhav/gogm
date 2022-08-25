@@ -21,6 +21,7 @@ package gogm
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	dsl "github.com/mindstand/go-cypherdsl"
@@ -90,7 +91,7 @@ func deleteNodeWithStringKey(deleteObj interface{}, field string, dbName string)
 		delValue := reflect.ValueOf(deleteObj).Elem()
 		id, ok := delValue.FieldByName(field).Interface().(string)
 		if !ok {
-			return nil, errors.New("unable to cast id to int64")
+			return nil, fmt.Errorf("deleteNodeWithStringKey: unable to cast value of field '%s' to string", field)
 		}
 
 		ids = append(ids, id)
