@@ -104,7 +104,7 @@ func main() {
 	// use nil or gogm.DefaultPrimaryKeyStrategy if you only want graph ids
 	pks := map[string]*gogm.PrimaryKeyStrategy{"UUID": gogm.UUIDPrimaryKeyStrategy}
 	pkm := map[string][]interface{}{"UUID": gogm.GetTypesSlice(&VertexA{}, &VertexB{}, &EdgeC{})}
-	_gogm, err := gogm.New(&config, pks, pkm)
+	_gogm, err := gogm.NewMulti(&config, pks, pkm)
 	if err != nil {
 		panic(err)
 	}
