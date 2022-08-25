@@ -65,7 +65,7 @@ func TestSetUuidIfNeeded(t *testing.T) {
 	val.Id = int64Ptr(10)
 	val.LoadMap = map[string]*RelationConfig{
 		"dasdfasd": {
-			Ids:          []int64{69},
+			Ids:          []interface{}{69},
 			RelationType: Single,
 		},
 	}

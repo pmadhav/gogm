@@ -54,7 +54,7 @@ func parseO2O(gogm *Gogm, req *require.Assertions) {
 				Id: int64Ptr(1),
 				LoadMap: map[string]*RelationConfig{
 					"SingleSpecA": {
-						Ids:          []int64{2},
+						Ids:          []interface{}{2},
 						RelationType: Single,
 					},
 				},
@@ -69,7 +69,7 @@ func parseO2O(gogm *Gogm, req *require.Assertions) {
 				Id: int64Ptr(2),
 				LoadMap: map[string]*RelationConfig{
 					"SingleSpec": {
-						Ids:          []int64{1},
+						Ids:          []interface{}{1},
 						RelationType: Single,
 					},
 				},
@@ -95,9 +95,9 @@ func parseO2O(gogm *Gogm, req *require.Assertions) {
 		// node id -- [field] config
 		oldRels = map[uintptr]map[string]*RelationConfig{}
 		// node id -- [field] config
-		curRels = map[int64]map[string]*RelationConfig{}
+		curRels = map[interface{}]map[string]*RelationConfig{}
 		// id to reflect value
-		nodeIdRef = map[uintptr]int64{}
+		nodeIdRef = map[uintptr]interface{}{}
 		// uintptr to reflect value (for new nodes that dont have a graph id yet)
 		nodeRef = map[uintptr]*reflect.Value{}
 	)
@@ -131,7 +131,7 @@ func parseM2O(gogm *Gogm, req *require.Assertions) {
 				Id: int64Ptr(1),
 				LoadMap: map[string]*RelationConfig{
 					"ManyA": {
-						Ids:          []int64{2},
+						Ids:          []interface{}{2},
 						RelationType: Multi,
 					},
 				},
@@ -148,7 +148,7 @@ func parseM2O(gogm *Gogm, req *require.Assertions) {
 				Id: int64Ptr(2),
 				LoadMap: map[string]*RelationConfig{
 					"ManyB": {
-						Ids:          []int64{1},
+						Ids:          []interface{}{1},
 						RelationType: Single,
 					},
 				},
@@ -167,9 +167,9 @@ func parseM2O(gogm *Gogm, req *require.Assertions) {
 		// node id -- [field] config
 		oldRels = map[uintptr]map[string]*RelationConfig{}
 		// node id -- [field] config
-		curRels = map[int64]map[string]*RelationConfig{}
+		curRels = map[interface{}]map[string]*RelationConfig{}
 		// id to reflect value
-		nodeIdRef = map[uintptr]int64{}
+		nodeIdRef = map[uintptr]interface{}{}
 		// uintptr to reflect value (for new nodes that dont have a graph id yet)
 		nodeRef = map[uintptr]*reflect.Value{}
 	)
@@ -200,7 +200,7 @@ func parseM2M(gogm *Gogm, req *require.Assertions) {
 
 				LoadMap: map[string]*RelationConfig{
 					"MultiA": {
-						Ids:          []int64{2},
+						Ids:          []interface{}{2},
 						RelationType: Multi,
 					},
 				},
@@ -218,7 +218,7 @@ func parseM2M(gogm *Gogm, req *require.Assertions) {
 				Id: int64Ptr(2),
 				LoadMap: map[string]*RelationConfig{
 					"Multi": {
-						Ids:          []int64{1},
+						Ids:          []interface{}{1},
 						RelationType: Multi,
 					},
 				},
@@ -239,9 +239,9 @@ func parseM2M(gogm *Gogm, req *require.Assertions) {
 		// node id -- [field] config
 		oldRels = map[uintptr]map[string]*RelationConfig{}
 		// node id -- [field] config
-		curRels = map[int64]map[string]*RelationConfig{}
+		curRels = map[interface{}]map[string]*RelationConfig{}
 		// id to reflect value
-		nodeIdRef = map[uintptr]int64{}
+		nodeIdRef = map[uintptr]interface{}{}
 		// uintptr to reflect value (for new nodes that dont have a graph id yet)
 		nodeRef = map[uintptr]*reflect.Value{}
 	)
@@ -267,23 +267,23 @@ func TestCalculateCurRels(t *testing.T) {
 
 	cases := []struct {
 		Name       string
-		Expected   map[int64]map[string]*RelationConfig
+		Expected   map[interface{}]map[string]*RelationConfig
 		Value      interface{}
 		ShouldPass bool
 		Depth      int
 	}{
 		{
 			Name: "Basic test",
-			Expected: map[int64]map[string]*RelationConfig{
-				1: {
+			Expected: map[interface{}]map[string]*RelationConfig{
+				"a1uuid": {
 					"MultiA": {
-						Ids:          []int64{2},
+						Ids:          []interface{}{2},
 						RelationType: Multi,
 					},
 				},
-				2: {
+				"b1uuid": {
 					"Multi": {
-						Ids:          []int64{1},
+						Ids:          []interface{}{1},
 						RelationType: Multi,
 					},
 				},
@@ -299,7 +299,7 @@ func TestCalculateCurRels(t *testing.T) {
 							Id: int64Ptr(1),
 							LoadMap: map[string]*RelationConfig{
 								"MultiA": {
-									Ids:          []int64{2},
+									Ids:          []interface{}{2},
 									RelationType: Multi,
 								},
 							},
@@ -316,7 +316,7 @@ func TestCalculateCurRels(t *testing.T) {
 							Id: int64Ptr(2),
 							LoadMap: map[string]*RelationConfig{
 								"Multi": {
-									Ids:          []int64{1},
+									Ids:          []interface{}{1},
 									RelationType: Multi,
 								},
 							},
@@ -336,26 +336,26 @@ func TestCalculateCurRels(t *testing.T) {
 		},
 		{
 			Name: "from integration test",
-			Expected: map[int64]map[string]*RelationConfig{
+			Expected: map[interface{}]map[string]*RelationConfig{
 				1: {
 					"SingleSpecA": {
-						Ids:          []int64{2},
+						Ids:          []interface{}{2},
 						RelationType: Single,
 					},
 					"ManyA": {
-						Ids:          []int64{3},
+						Ids:          []interface{}{3},
 						RelationType: Multi,
 					},
 				},
 				2: {
 					"SingleSpec": {
-						Ids:          []int64{1},
+						Ids:          []interface{}{1},
 						RelationType: Single,
 					},
 				},
 				3: {
 					"ManyB": {
-						Ids:          []int64{1},
+						Ids:          []interface{}{1},
 						RelationType: Single,
 					},
 				},
@@ -431,9 +431,9 @@ func TestCalculateCurRels(t *testing.T) {
 			// node id -- [field] config
 			oldRels = map[uintptr]map[string]*RelationConfig{}
 			// node id -- [field] config
-			curRels = map[int64]map[string]*RelationConfig{}
+			curRels = map[interface{}]map[string]*RelationConfig{}
 			// id to reflect value
-			nodeIdRef = map[uintptr]int64{}
+			nodeIdRef = map[uintptr]interface{}{}
 			// uintptr to reflect value (for new nodes that dont have a graph id yet)
 			nodeRef = map[uintptr]*reflect.Value{}
 		)
@@ -458,24 +458,24 @@ func TestCalculateDels(t *testing.T) {
 	dels, err := calculateDels(map[uintptr]map[string]*RelationConfig{
 		uintptr(1): {
 			"RelField": {
-				Ids:          []int64{2},
+				Ids:          []interface{}{2},
 				RelationType: Single,
 			},
 		},
 		uintptr(2): {
 			"RelField2": {
-				Ids:          []int64{1},
+				Ids:          []interface{}{1},
 				RelationType: Single,
 			},
 		},
-	}, map[int64]map[string]*RelationConfig{
+	}, map[interface{}]map[string]*RelationConfig{
 		1: {
 			"RelField": {
-				Ids:          []int64{},
+				Ids:          []interface{}{},
 				RelationType: Single,
 			},
 		},
-	}, map[uintptr]int64{
+	}, map[uintptr]interface{}{
 		uintptr(1): 1,
 		uintptr(2): 2,
 	})
@@ -489,30 +489,30 @@ func TestCalculateDels(t *testing.T) {
 	dels, err = calculateDels(map[uintptr]map[string]*RelationConfig{
 		uintptr(1): {
 			"RelField": {
-				Ids:          []int64{2},
+				Ids:          []interface{}{2},
 				RelationType: Single,
 			},
 		},
 		uintptr(2): {
 			"RelField2": {
-				Ids:          []int64{1},
+				Ids:          []interface{}{1},
 				RelationType: Single,
 			},
 		},
-	}, map[int64]map[string]*RelationConfig{
+	}, map[interface{}]map[string]*RelationConfig{
 		1: {
 			"RelField": {
-				Ids:          []int64{},
+				Ids:          []interface{}{},
 				RelationType: Single,
 			},
 		},
 		2: {
 			"RelFieldNew": {
-				Ids:          []int64{},
+				Ids:          []interface{}{},
 				RelationType: Single,
 			},
 		},
-	}, map[uintptr]int64{
+	}, map[uintptr]interface{}{
 		uintptr(1): 1,
 		uintptr(2): 2,
 	})
@@ -527,30 +527,30 @@ func TestCalculateDels(t *testing.T) {
 	dels, err = calculateDels(map[uintptr]map[string]*RelationConfig{
 		uintptr(1): {
 			"RelField": {
-				Ids:          []int64{2},
+				Ids:          []interface{}{2},
 				RelationType: Single,
 			},
 		},
 		uintptr(2): {
 			"RelField2": {
-				Ids:          []int64{1},
+				Ids:          []interface{}{1},
 				RelationType: Single,
 			},
 		},
-	}, map[int64]map[string]*RelationConfig{
+	}, map[interface{}]map[string]*RelationConfig{
 		1: {
 			"RelField": {
-				Ids:          []int64{},
+				Ids:          []interface{}{},
 				RelationType: Single,
 			},
 		},
 		2: {
 			"RelField2": {
-				Ids:          []int64{},
+				Ids:          []interface{}{},
 				RelationType: Single,
 			},
 		},
-	}, map[uintptr]int64{
+	}, map[uintptr]interface{}{
 		uintptr(1): 1,
 		uintptr(2): 2,
 	})
@@ -565,30 +565,30 @@ func TestCalculateDels(t *testing.T) {
 	dels, err = calculateDels(map[uintptr]map[string]*RelationConfig{
 		uintptr(1): {
 			"RelField": {
-				Ids:          []int64{2},
+				Ids:          []interface{}{2},
 				RelationType: Single,
 			},
 		},
 		uintptr(2): {
 			"RelField2": {
-				Ids:          []int64{1},
+				Ids:          []interface{}{1},
 				RelationType: Single,
 			},
 		},
-	}, map[int64]map[string]*RelationConfig{
+	}, map[interface{}]map[string]*RelationConfig{
 		1: {
 			"RelField": {
-				Ids:          []int64{2},
+				Ids:          []interface{}{2},
 				RelationType: Single,
 			},
 		},
 		2: {
 			"RelField2": {
-				Ids:          []int64{1},
+				Ids:          []interface{}{1},
 				RelationType: Single,
 			},
 		},
-	}, map[uintptr]int64{
+	}, map[uintptr]interface{}{
 		uintptr(1): 1,
 		uintptr(2): 2,
 	})
