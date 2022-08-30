@@ -414,7 +414,7 @@ func (s *Session) SaveDepth(saveObj interface{}, depth int) error {
 	}
 
 	// handle if in transaction
-	return s.runWrite(saveDepth(s.gogm, saveObj, depth))
+	return s.runWrite(saveDepth(s.gogm, saveObj, depth, nil))
 }
 
 func (s *Session) Delete(deleteObj interface{}) error {

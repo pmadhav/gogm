@@ -308,8 +308,7 @@ func listComprehension(gogm *Gogm, fromNodeVar, label string, rel decoratorConfi
 	return clause, nil
 }
 
-// SchemaLoadStrategyMany loads many using schema strategy
-func SchemaLoadStrategyMany(gogm *Gogm, variable, label string, depth int, additionalConstraints dsl.ConditionOperator) (dsl.Cypher, error) {
+func SchemaLoadStrategyManyMatch(variable, label string, depth int, additionalConstraints dsl.ConditionOperator) (dsl.Cypher, error) {
 	if variable == "" {
 		return nil, errors.New("variable name cannot be empty")
 	}
@@ -328,6 +327,10 @@ func SchemaLoadStrategyMany(gogm *Gogm, variable, label string, depth int, addit
 		builder = builder.Where(additionalConstraints)
 	}
 
+	return builder, nil
+}
+
+func SchemaLoadStrategyManyReturn(gogm *Gogm, variable, label string, depth int, builder dsl.Cypher) (dsl.Cypher, error) {
 	builder = builder.Cypher("RETURN " + variable)
 
 	if depth > 0 {
@@ -339,6 +342,19 @@ func SchemaLoadStrategyMany(gogm *Gogm, variable, label string, depth int, addit
 	}
 
 	return builder, nil
+}
+
+// SchemaLoadStrategyMany loads many using schema strategy
+// Split this into `SchemaLoadStrategyManyMatch` and `SchemaLoadStrategyManyReturn`
+// so that they can be used separately as well.
+func SchemaLoadStrategyMany(gogm *Gogm, variable, label string, depth int, additionalConstraints dsl.ConditionOperator) (dsl.Cypher, error) {
+	builder, err := SchemaLoadStrategyManyMatch(variable, label, depth, additionalConstraints)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return SchemaLoadStrategyManyReturn(gogm, variable, label, depth, builder)
 }
 
 // SchemaLoadStrategyOne loads one object using schema strategy

@@ -85,6 +85,9 @@ type ogmFunctions interface {
 	//save object with depth
 	SaveDepth(ctx context.Context, saveObj interface{}, depth int) error
 
+	//update object with depth
+	Update(ctx context.Context, updateObj interface{}, depth int, respObj interface{}, filter dsl.ConditionOperator) error
+
 	//delete
 	Delete(ctx context.Context, deleteObj interface{}) error
 

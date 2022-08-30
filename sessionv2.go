@@ -314,19 +314,11 @@ func (s *SessionV2Impl) LoadAllDepthFilter(ctx context.Context, respObj interfac
 	return s.LoadAllDepthFilterPagination(ctx, respObj, depth, filter, params, nil)
 }
 
-func (s *SessionV2Impl) LoadAllDepthFilterPagination(ctx context.Context, respObj interface{}, depth int, filter dsl.ConditionOperator, params map[string]interface{}, pagination *Pagination) error {
-	var span opentracing.Span
-	if ctx != nil && s.gogm.config.OpentracingEnabled {
-		span, ctx = opentracing.StartSpanFromContext(ctx, "gogm.SessionV2Impl.LoadAllDepthFilterPagination")
-		defer span.Finish()
-	} else {
-		span = nil
-	}
-
+func GetRespObjLabel(respObj interface{}) (string, error) {
 	rawRespType := reflect.TypeOf(respObj)
 
 	if rawRespType.Kind() != reflect.Ptr {
-		return fmt.Errorf("respObj must be a pointer to a slice, instead it is %T", respObj)
+		return "", fmt.Errorf("respObj must be a pointer to a slice, instead it is %T", respObj)
 	}
 
 	//deref to a slice
@@ -334,7 +326,7 @@ func (s *SessionV2Impl) LoadAllDepthFilterPagination(ctx context.Context, respOb
 
 	//validate type is ptr
 	if respType.Kind() != reflect.Slice {
-		return fmt.Errorf("respObj must be type slice, instead it is %T", respObj)
+		return "", fmt.Errorf("respObj must be type slice, instead it is %T", respObj)
 	}
 
 	//"deref" reflect interface type
@@ -347,6 +339,23 @@ func (s *SessionV2Impl) LoadAllDepthFilterPagination(ctx context.Context, respOb
 
 	//get the type name -- this maps directly to the label
 	respObjName := respType.Name()
+	return respObjName, nil
+}
+
+func (s *SessionV2Impl) LoadAllDepthFilterPagination(ctx context.Context, respObj interface{}, depth int, filter dsl.ConditionOperator, params map[string]interface{}, pagination *Pagination) error {
+	var span opentracing.Span
+	if ctx != nil && s.gogm.config.OpentracingEnabled {
+		span, ctx = opentracing.StartSpanFromContext(ctx, "gogm.SessionV2Impl.LoadAllDepthFilterPagination")
+		defer span.Finish()
+	} else {
+		span = nil
+	}
+
+	respObjName, err2 := GetRespObjLabel(respObj)
+
+	if err2 != nil {
+		return err2
+	}
 
 	//will need to keep track of these variables
 	varName := "n"
@@ -456,7 +465,68 @@ func (s *SessionV2Impl) SaveDepth(ctx context.Context, saveObj interface{}, dept
 		return errors.New("neo4j connection not initialized")
 	}
 
-	return s.runWrite(ctx, saveDepth(s.gogm, saveObj, depth))
+	return s.runWrite(ctx, saveDepth(s.gogm, saveObj, depth, nil))
+}
+
+func (s *SessionV2Impl) SaveDepthFilter(ctx context.Context, saveObj interface{}, depth int, filter dsl.ConditionOperator) error {
+	var span opentracing.Span
+	if ctx != nil && s.gogm.config.OpentracingEnabled {
+		span, ctx = opentracing.StartSpanFromContext(ctx, "gogm.SessionV2Impl.SaveDepth")
+		defer span.Finish()
+	} else {
+		span = nil
+	}
+
+	if s.neoSess == nil {
+		return errors.New("neo4j connection not initialized")
+	}
+
+	return s.runWrite(ctx, saveDepth(s.gogm, saveObj, depth, nil))
+}
+
+//update object with depth
+func (s *SessionV2Impl) Update(ctx context.Context, updateObj interface{}, depth int, respObj interface{}, filter dsl.ConditionOperator) error {
+	var labelMatchQueryMap map[string]dsl.Cypher = nil
+	var err error
+
+	if respObj != nil {
+		respObjName, err2 := GetRespObjLabel(respObj)
+
+		if err2 != nil {
+			return err2
+		}
+
+		//will need to keep track of these variables
+		varName := "n"
+
+		var query dsl.Cypher
+
+		query, err = SchemaLoadStrategyManyMatch(varName, respObjName, depth, filter)
+
+		if err != nil {
+			return err
+		}
+
+		labelMatchQueryMap = map[string]dsl.Cypher{
+			respObjName: query,
+		}
+	}
+
+	if s.neoSess == nil {
+		return errors.New("neo4j connection not initialized")
+	}
+
+	err = s.runWrite(ctx, saveDepth(s.gogm, updateObj, depth, labelMatchQueryMap))
+
+	if err != nil {
+		return err
+	}
+
+	if respObj != nil {
+		return s.LoadAllDepthFilter(ctx, respObj, depth, filter, nil)
+	}
+
+	return nil
 }
 
 func (s *SessionV2Impl) Delete(ctx context.Context, deleteObj interface{}) error {

@@ -59,7 +59,7 @@ type relCreate struct {
 	Direction dsl.Direction
 }
 
-func saveDepth(gogm *Gogm, obj interface{}, depth int) neo4j.TransactionWork {
+func saveDepth(gogm *Gogm, obj interface{}, depth int, labelMatchQueryMap map[string]dsl.Cypher) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		if obj == nil {
 			return nil, errors.New("obj can not be nil")
@@ -119,7 +119,7 @@ func saveDepth(gogm *Gogm, obj interface{}, depth int) neo4j.TransactionWork {
 			return nil, fmt.Errorf("failed to parse struct, %w", err)
 		}
 		// save/update nodes
-		err = createNodes(tx, gogm, nodes, nodeRef, nodeIdRef)
+		err = createNodes(tx, gogm, nodes, nodeRef, nodeIdRef, labelMatchQueryMap)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create nodes, %w", err)
 		}
@@ -627,18 +627,34 @@ func generateCurRelsInternal(gogm *Gogm, parentPtr uintptr, current *reflect.Val
 	return nil
 }
 
+func getLabelMatchQuery(label string, labelMatchQueryMap map[string]dsl.Cypher) dsl.Cypher {
+	if labelMatchQueryMap != nil {
+		if val, ok := labelMatchQueryMap[label]; ok {
+			return val
+		}
+	}
+	return nil
+}
+
 // createNodes updates existing nodes and creates new nodes while also making a lookup table for ptr -> neoid
-func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]map[uintptr]*nodeCreate, nodeRef map[uintptr]*reflect.Value, nodeIdRef map[uintptr]interface{}) error {
+func createNodes(transaction neo4j.Transaction, gogm *Gogm,
+	crNodes map[string]map[uintptr]*nodeCreate, nodeRef map[uintptr]*reflect.Value,
+	nodeIdRef map[uintptr]interface{}, labelMatchQueryMap map[string]dsl.Cypher) error {
 	for label, nodes := range crNodes {
 		// used when the id of the node hasn't been set yet
 		var i uint64 = 0
 		var nodesArr []*nodeCreate
+		labelMatchQuery := getLabelMatchQuery(label, labelMatchQueryMap)
 
 		var updateRows, newRows []interface{}
 		for ptr, config := range nodes {
 			row := map[string]interface{}{}
 
-			if config.IsPatch && config.PKS.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
+			if config.IsPatch && labelMatchQuery != nil {
+				row["obj"] = config.Params
+				row["i"] = fmt.Sprintf("%d", i)
+				updateRows = append(updateRows, row)
+			} else if config.IsPatch && config.PKS.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
 				// This is an update for the non-default PrimaryKeyStrategy
 				row[config.PKS.DBName] = config.Params[config.PKS.DBName]
 				delete(config.Params, config.PKS.DBName)
@@ -790,47 +806,63 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm, crNodes map[string]m
 
 		// process stuff that we're updating
 		if len(updateRows) != 0 {
-			pks := gogm.GetPrimaryKeyStrategy(label)
-			path, err := dsl.Path().V(dsl.V{
-				Name: "n",
-				Type: "`" + label + "`",
-			}).ToCypher()
-			if err != nil {
-				return err
-			}
-
+			var matchClause string = ""
+			var eerr error
+			var newC dsl.Cypher
 			var whereClause string = ""
 			var addReturn bool = false
 
-			if pks.FieldName == DefaultPrimaryKeyStrategy.FieldName {
-				whereClause = "WHERE ID(n) = row.id"
-			} else {
-				whereClause = fmt.Sprintf("WHERE n.%s = row.%s", pks.DBName, pks.DBName)
-				addReturn = true
-			}
+			pks := gogm.GetPrimaryKeyStrategy(label)
 
-			newC := dsl.QB().
-				Cypher("UNWIND $rows as row").
-				Cypher(fmt.Sprintf("MATCH %s", path)).
-				Cypher(whereClause).
-				Cypher("SET n += row.obj")
+			if labelMatchQuery != nil {
+				matchClause, eerr = labelMatchQuery.ToCypher()
+				if eerr != nil {
+					return eerr
+				}
+				newC = dsl.QB().
+					Cypher("UNWIND $rows as row").
+					Cypher(matchClause).
+					Cypher("SET n += row.obj")
+				addReturn = true
+			} else {
+				if pks.FieldName == DefaultPrimaryKeyStrategy.FieldName {
+					whereClause = "WHERE ID(n) = row.id"
+				} else {
+					whereClause = fmt.Sprintf("WHERE n.%s = row.%s", pks.DBName, pks.DBName)
+					addReturn = true
+				}
+
+				newC = dsl.QB().
+					Cypher("UNWIND $rows as row").
+					Cypher(fmt.Sprintf("MATCH (n:%s)", label)).
+					Cypher(whereClause).
+					Cypher("SET n += row.obj")
+			}
 
 			// we need data back in case this label type uses non default PKS
 			// We get the neo4j ID back and set it in `nodeIdRef`
 			if addReturn {
-				newC = newC.Return(false, dsl.ReturnPart{
+				retArr := []dsl.ReturnPart{}
+				retArr = append(retArr, dsl.ReturnPart{
 					Name:  "row.i",
 					Alias: "i",
-				}, dsl.ReturnPart{
+				})
+				retArr = append(retArr, dsl.ReturnPart{
 					Function: &dsl.FunctionConfig{
 						Name:   "ID",
 						Params: []interface{}{dsl.ParamString("n")},
 					},
 					Alias: "id",
-				}, dsl.ReturnPart{
-					Name:  fmt.Sprintf("row.%s", pks.DBName),
-					Alias: "unique_id",
 				})
+
+				if labelMatchQuery == nil {
+					// unique_id is only needed if a labelMatchQuery was not specified
+					retArr = append(retArr, dsl.ReturnPart{
+						Name:  fmt.Sprintf("row.%s", pks.DBName),
+						Alias: "unique_id",
+					})
+				}
+				newC = newC.Return(false, retArr...)
 			} else {
 				newC = newC.Return(false, dsl.ReturnPart{
 					Name:  "row.i",
