@@ -100,6 +100,9 @@ type ogmFunctions interface {
 	//delete object with string key type
 	DeleteObjectsWithStringKey(ctx context.Context, deleteObj interface{}, pks *PrimaryKeyStrategy) error
 
+	//delete objects that match the filter
+	FilterDelete(ctx context.Context, label string, filter dsl.ConditionOperator) error
+
 	//specific query, responds to slice and single objects
 	Query(ctx context.Context, query string, properties map[string]interface{}, respObj interface{}) error
 

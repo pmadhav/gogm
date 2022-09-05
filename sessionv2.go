@@ -616,6 +616,17 @@ func (s *SessionV2Impl) DeleteObjectsWithStringKey(ctx context.Context,
 	return s.runWrite(ctx, workFunc)
 }
 
+//delete objects that match the filter
+func (s *SessionV2Impl) FilterDelete(ctx context.Context, label string, filter dsl.ConditionOperator) error {
+	// handle if in transaction
+	workFunc, err := deleteByFilter(label, filter)
+	if err != nil {
+		return fmt.Errorf("FilterDelete: failed to generate work func for delete, %w", err)
+	}
+
+	return s.runWrite(ctx, workFunc)
+}
+
 func (s *SessionV2Impl) runWrite(ctx context.Context, work neo4j.TransactionWork) error {
 	var span opentracing.Span
 	if ctx != nil && s.gogm.config.OpentracingEnabled {

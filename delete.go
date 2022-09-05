@@ -187,3 +187,23 @@ func deleteByStrings(field string, ids ...string) neo4j.TransactionWork {
 		return nil, nil
 	}
 }
+
+// deleteByFilter: deletes nodes matching the filter
+func deleteByFilter(label string, filter dsl.ConditionOperator) (neo4j.TransactionWork, error) {
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		cyp, err := dsl.QB().
+			Match(dsl.Path().V(dsl.V{Name: "n", Type: label}).Build()).
+			Where(filter).
+			Delete(true, "n").
+			ToCypher()
+		if err != nil {
+			return nil, err
+		}
+		_, err = tx.Run(cyp, map[string]interface{}{})
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}, nil
+}
