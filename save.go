@@ -344,9 +344,6 @@ func removeRelations(transaction neo4j.Transaction, dels map[interface{}]*DelRel
 			"startNodeId": id,
 			"endNodeIds":  ids.DelIds,
 		}
-		// if DefaultPrimaryKeyStrategy.StrategyName != ids.Pks.StrategyName {
-		// 	tmpMap["uniqueid"] = ids.Pks.DBName
-		// }
 		if !paramListOk {
 			paramList := &RemoveParams{}
 			paramList.Pks = ids.Pks
@@ -402,7 +399,6 @@ func internalRemoveRelations(transaction neo4j.Transaction, params []map[string]
 	if err != nil {
 		return err
 	}
-	fmt.Printf("internalRemoveRelations: cypher: %s params: %#v\n", cyq, params)
 
 	res, err := transaction.Run(cyq, map[string]interface{}{
 		"rows": params,
@@ -465,10 +461,7 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig,
 			//this means that the node is gone, remove all rels to this node
 			deleteAllRels = true
 		} else {
-			// nodeType := node.Type()
-			// nodeKind := node.Kind()
 			nodeElem := node.Elem()
-			// fmt.Printf("calculateDels: nodeType: %#v nodeKind: %#v nodeElem: %#v\n", nodeType, nodeKind, nodeElem)
 			for field, oldConf := range oldRelConf {
 				nodeField := nodeElem.FieldByName(field)
 				fieldType, _, fErr := getTypeName(nodeField.Type())
@@ -477,7 +470,6 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig,
 				}
 				// Get the PKS given the fieldType
 				pks := gogm.GetPrimaryKeyStrategy(fieldType)
-				// fmt.Printf("calculateDels: pks: %#v\n", pks)
 				curConf, ok := curRelConf[field]
 				deleteAllRelsOnField := false
 				if !ok {
