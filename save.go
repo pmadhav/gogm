@@ -59,6 +59,28 @@ type relCreate struct {
 	Direction dsl.Direction
 }
 
+// delRelInfo holds information about relationships that need to be deleted
+type DelRelInfo struct {
+	// Primary Key Strategy of the startId
+	Pks *PrimaryKeyStrategy
+	// Rel Field
+	FieldName string
+	// Rel Field Type
+	FieldType string
+	// Ids to Delete
+	DelIds []interface{}
+}
+
+// RemoveParams holds information about relationships that need to be deleted
+type RemoveParams struct {
+	// PKS of the start node type
+	Pks *PrimaryKeyStrategy
+	// map that stores the start/end points of the rel and the dbfield of the start node
+	Params []map[string]interface{}
+	// Number of rels expected to be deleted
+	ExpectedDels int
+}
+
 func saveDepth(gogm *Gogm, obj interface{}, depth int, labelMatchQueryMap map[string]dsl.Cypher) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		if obj == nil {
@@ -130,7 +152,7 @@ func saveDepth(gogm *Gogm, obj interface{}, depth int, labelMatchQueryMap map[st
 			return nil, fmt.Errorf("failed to calculate current relationships, %w", err)
 		}
 
-		dels, err := calculateDels(oldRels, curRels, nodeIdRef)
+		dels, err := calculateDels(oldRels, curRels, nodeIdRef, nodeRef, gogm)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate relationships to delete, %w", err)
 		}
@@ -306,20 +328,61 @@ func relateNodes(transaction neo4j.Transaction, relations map[string][]*relCreat
 }
 
 // removes relationships between specified nodes
-func removeRelations(transaction neo4j.Transaction, dels map[interface{}][]interface{}) error {
+func removeRelations(transaction neo4j.Transaction, dels map[interface{}]*DelRelInfo) error {
 	if len(dels) == 0 {
 		return nil
 	}
 
-	var params []interface{}
+	params := map[string]*RemoveParams{}
 
-	expectedDels := 0
 	for id, ids := range dels {
-		params = append(params, map[string]interface{}{
+		var paramList *RemoveParams
+		var paramListOk bool
+		paramList, paramListOk = params[ids.Pks.StrategyName]
+
+		tmpMap := map[string]interface{}{
 			"startNodeId": id,
-			"endNodeIds":  ids,
-		})
-		expectedDels += len(ids)
+			"endNodeIds":  ids.DelIds,
+		}
+		// if DefaultPrimaryKeyStrategy.StrategyName != ids.Pks.StrategyName {
+		// 	tmpMap["uniqueid"] = ids.Pks.DBName
+		// }
+		if !paramListOk {
+			paramList := &RemoveParams{}
+			paramList.Pks = ids.Pks
+			paramList.Params = append(paramList.Params, tmpMap)
+			paramList.ExpectedDels = len(ids.DelIds)
+			params[ids.Pks.StrategyName] = paramList
+		} else {
+			paramList.Params = append(paramList.Params, tmpMap)
+			paramList.ExpectedDels += len(ids.DelIds)
+		}
+	}
+
+	for strategyName, paramList := range params {
+		var isDefault bool = true
+		var uniqueField string = ""
+		if strategyName != DefaultPrimaryKeyStrategy.StrategyName {
+			isDefault = false
+			uniqueField = paramList.Pks.DBName
+		}
+		err := internalRemoveRelations(transaction, paramList.Params, isDefault, paramList.ExpectedDels, uniqueField)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func internalRemoveRelations(transaction neo4j.Transaction, params []map[string]interface{}, isDefault bool,
+	expectedDels int, uniqueField string) error {
+	var whereClause string
+
+	if isDefault {
+		whereClause = "WHERE id(start) = row.startNodeId and id(end) in row.endNodeIds"
+	} else {
+		whereClause = fmt.Sprintf("WHERE start.%s = row.startNodeId and id(end) in row.endNodeIds", uniqueField)
 	}
 
 	cyq, err := dsl.QB().
@@ -333,12 +396,13 @@ func removeRelations(transaction neo4j.Transaction, dels map[interface{}][]inter
 		}).V(dsl.V{
 			Name: "end",
 		}).Build()).
-		Cypher("WHERE id(start) = row.startNodeId and id(end) in row.endNodeIds").
+		Cypher(whereClause).
 		Delete(false, "e").
 		ToCypher()
 	if err != nil {
 		return err
 	}
+	fmt.Printf("internalRemoveRelations: cypher: %s params: %#v\n", cyq, params)
 
 	res, err := transaction.Run(cyq, map[string]interface{}{
 		"rows": params,
@@ -362,15 +426,35 @@ func removeRelations(transaction neo4j.Transaction, dels map[interface{}][]inter
 	return nil
 }
 
+func getDelRelInfo(pks *PrimaryKeyStrategy, field string, fieldType string) *DelRelInfo {
+	return &DelRelInfo{
+		Pks:       pks,
+		FieldName: field,
+		FieldType: fieldType,
+		DelIds:    []interface{}{},
+	}
+}
+
+func (d *DelRelInfo) append(id interface{}) {
+	d.DelIds = append(d.DelIds, id)
+}
+
 // calculates which relationships to delete
-func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[interface{}]map[string]*RelationConfig, lookup map[uintptr]interface{}) (map[interface{}][]interface{}, error) {
+func calculateDels(oldRels map[uintptr]map[string]*RelationConfig,
+	curRels map[interface{}]map[string]*RelationConfig,
+	lookup map[uintptr]interface{},
+	nodeRef map[uintptr]*reflect.Value, gogm *Gogm) (map[interface{}]*DelRelInfo, error) {
 	if len(oldRels) == 0 {
-		return map[interface{}][]interface{}{}, nil
+		return map[interface{}]*DelRelInfo{}, nil
 	}
 
-	dels := map[interface{}][]interface{}{}
+	dels := map[interface{}]*DelRelInfo{}
 
 	for ptr, oldRelConf := range oldRels {
+		node, nodeOk := nodeRef[ptr]
+		if !nodeOk {
+			return nil, fmt.Errorf("node not found for ptr [%v]", ptr)
+		}
 		oldId, ok := lookup[ptr]
 		if !ok {
 			return nil, fmt.Errorf("graph id not found for ptr [%v]", ptr)
@@ -381,7 +465,19 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[i
 			//this means that the node is gone, remove all rels to this node
 			deleteAllRels = true
 		} else {
+			// nodeType := node.Type()
+			// nodeKind := node.Kind()
+			nodeElem := node.Elem()
+			// fmt.Printf("calculateDels: nodeType: %#v nodeKind: %#v nodeElem: %#v\n", nodeType, nodeKind, nodeElem)
 			for field, oldConf := range oldRelConf {
+				nodeField := nodeElem.FieldByName(field)
+				fieldType, _, fErr := getTypeName(nodeField.Type())
+				if fErr != nil {
+					return nil, fErr
+				}
+				// Get the PKS given the fieldType
+				pks := gogm.GetPrimaryKeyStrategy(fieldType)
+				// fmt.Printf("calculateDels: pks: %#v\n", pks)
 				curConf, ok := curRelConf[field]
 				deleteAllRelsOnField := false
 				if !ok {
@@ -392,17 +488,21 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig, curRels map[i
 				for _, id := range oldConf.Ids {
 					//check if this id is new rels in the same location
 					if deleteAllRels || deleteAllRelsOnField {
-						if _, ok := dels[oldId]; !ok {
-							dels[oldId] = []interface{}{id}
+						if info, ok := dels[oldId]; !ok {
+							info = getDelRelInfo(pks, field, fieldType)
+							info.append(id)
+							dels[oldId] = info
 						} else {
-							dels[oldId] = append(dels[oldId], id)
+							info.append(id)
 						}
 					} else {
 						if !interfaceSliceContains(curConf.Ids, id) {
-							if _, ok := dels[oldId]; !ok {
-								dels[oldId] = []interface{}{id}
+							if info, ok := dels[oldId]; !ok {
+								info = getDelRelInfo(pks, field, fieldType)
+								info.append(id)
+								dels[oldId] = info
 							} else {
-								dels[oldId] = append(dels[oldId], id)
+								info.append(id)
 							}
 						}
 					}
