@@ -80,13 +80,13 @@ func TestSetUuidIfNeeded(t *testing.T) {
 func TestGetTypeName(t *testing.T) {
 	val := &a{}
 
-	name, _, err := getTypeName(reflect.TypeOf(val))
+	name, _, err := GetTypeName(reflect.TypeOf(val))
 	require.Nil(t, err)
 	require.EqualValues(t, "a", name)
 
 	val1 := []a{}
 
-	name, _, err = getTypeName(reflect.TypeOf(val1))
+	name, _, err = GetTypeName(reflect.TypeOf(val1))
 	require.Nil(t, err)
 	require.EqualValues(t, "a", name)
 }

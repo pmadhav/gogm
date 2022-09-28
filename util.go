@@ -148,7 +148,7 @@ func handleNodeState(pkStrat *PrimaryKeyStrategy, isPatch bool, val *reflect.Val
 }
 
 // gets the type name from reflect type
-func getTypeName(val reflect.Type) (string, bool, error) {
+func GetTypeName(val reflect.Type) (string, bool, error) {
 	isPatch := false
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()

@@ -464,7 +464,7 @@ func calculateDels(oldRels map[uintptr]map[string]*RelationConfig,
 			nodeElem := node.Elem()
 			for field, oldConf := range oldRelConf {
 				nodeField := nodeElem.FieldByName(field)
-				fieldType, _, fErr := getTypeName(nodeField.Type())
+				fieldType, _, fErr := GetTypeName(nodeField.Type())
 				if fErr != nil {
 					return nil, fErr
 				}
@@ -539,7 +539,7 @@ func generateCurRelsInternal(gogm *Gogm, parentPtr uintptr, current *reflect.Val
 	}
 
 	//get the type
-	nodeType, _, err := getTypeName(current.Type())
+	nodeType, _, err := GetTypeName(current.Type())
 	if err != nil {
 		return err
 	}
@@ -618,7 +618,7 @@ func generateCurRelsInternal(gogm *Gogm, parentPtr uintptr, current *reflect.Val
 				e1 := followVal.Elem()
 
 				//get the type
-				nodeType2, _, err2 := getTypeName(followVal.Type())
+				nodeType2, _, err2 := GetTypeName(followVal.Type())
 				if err2 != nil {
 					return err2
 				}
@@ -671,7 +671,7 @@ func generateCurRelsInternal(gogm *Gogm, parentPtr uintptr, current *reflect.Val
 			e1 := followVal.Elem()
 
 			//get the type
-			nodeType2, _, err2 := getTypeName(followVal.Type())
+			nodeType2, _, err2 := GetTypeName(followVal.Type())
 			if err2 != nil {
 				return err2
 			}
@@ -1082,7 +1082,7 @@ func parseStructInternal(gogm *Gogm, parentPtr uintptr, edgeLabel string, parent
 	curPtr := current.Pointer()
 
 	//get the type
-	nodeType, isPatch, err := getTypeName(current.Type())
+	nodeType, isPatch, err := GetTypeName(current.Type())
 	if err != nil {
 		return err
 	}
@@ -1251,7 +1251,7 @@ func parseStructInternal(gogm *Gogm, parentPtr uintptr, edgeLabel string, parent
 func processStruct(gogm *Gogm, fieldConf decoratorConfig, relValue *reflect.Value, curPtr uintptr) (parentId uintptr, edgeLabel string, parentIsStart bool, direction dsl.Direction, edgeParams map[string]interface{}, followVal *reflect.Value, err error) {
 	edgeLabel = fieldConf.Relationship
 
-	relValName, _, err := getTypeName(relValue.Type())
+	relValName, _, err := GetTypeName(relValue.Type())
 	if err != nil {
 		return 0, "", false, 0, nil, nil, err
 	}
