@@ -743,6 +743,11 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm,
 			row := map[string]interface{}{}
 
 			if config.IsPatch && labelMatchQuery != nil {
+				if config.PKS.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
+					// This is an update for the non-default PrimaryKeyStrategy
+					row[config.PKS.DBName] = config.Params[config.PKS.DBName]
+					delete(config.Params, config.PKS.DBName)
+				}
 				row["obj"] = config.Params
 				row["i"] = fmt.Sprintf("%d", i)
 				updateRows = append(updateRows, row)
@@ -947,7 +952,7 @@ func createNodes(transaction neo4j.Transaction, gogm *Gogm,
 					Alias: "id",
 				})
 
-				if labelMatchQuery == nil {
+				if pks.StrategyName != DefaultPrimaryKeyStrategy.StrategyName {
 					// unique_id is only needed if a labelMatchQuery was not specified
 					retArr = append(retArr, dsl.ReturnPart{
 						Name:  fmt.Sprintf("row.%s", pks.DBName),
